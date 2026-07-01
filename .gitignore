@@ -1,0 +1,43 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build output
+bin/
+obj/
+
+# NuGet
+*.nupkg
+*.snupkg
+project.lock.json
+packages/
+.nuget/
+
+# Docker
+docker-compose.override.yml
+.dockerignore
+
+# Środowisko / sekrety
+.env
+.env.local
+.env.*.local
+appsettings.Development.json
+appsettings.Local.json
+**/secrets.json
+
+# Logi
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Rider / JetBrains
+.idea/
+
+# VS Code
+.vscode/
