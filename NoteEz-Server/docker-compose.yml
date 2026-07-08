@@ -29,6 +29,8 @@ services:
       - Jwt__Issuer=${JWT_ISSUER}
       - Jwt__Audience=${JWT_AUDIENCE}
       - ASPNETCORE_ENVIRONMENT=Development
+      - AzureBlobStorage__ConnectionString=${AZURE_BLOB_CONNECTION_STRING}
+      - AzureBlobStorage__ContainerName=${AZURE_BLOB_CONTAINER_NAME}
     ports:
       - "8080:8080"
 
