@@ -56,7 +56,7 @@ namespace NoteEz_Server.Services
 
             if (audio is null) return false;
 
-            var blobName = new Uri(audio.BlobUrl).Segments.Last();
+            var blobName = $"{noteId}/{audioId}.webm";
             await _blobContainer.GetBlobClient(blobName).DeleteIfExistsAsync();
 
             _db.NoteAudios.Remove(audio);
@@ -72,7 +72,7 @@ namespace NoteEz_Server.Services
             var clips = await _db.NoteAudios.Where(a => a.NoteId == noteId).ToListAsync();
             foreach (var clip in clips)
             {
-                var blobName = new Uri(clip.BlobUrl).Segments.Last();
+                var blobName = $"{noteId}/{clip.Id}.webm";
                 await _blobContainer.GetBlobClient(blobName).DeleteIfExistsAsync();
             }
         }
@@ -84,15 +84,7 @@ namespace NoteEz_Server.Services
 
             if (audio is null) return null;
 
-            var blobName = new Uri(audio.BlobUrl).Segments.Last();
-
-            Console.WriteLine($"Pełny BlobUrl z bazy: {audio.BlobUrl}");
-            Console.WriteLine($"Wyciągnięta nazwa bloba: {blobName}");
-
-            blobName = $"{noteId}/{audioId}.webm"; // Poprawna ścieżka do bloba w kontenerze
-
-            Console.WriteLine($"Pełny poprawiony BlobUrl z bazy: {audio.BlobUrl}");
-            Console.WriteLine($"Wyciągnięta poprawiona nazwa bloba: {blobName}");
+            var blobName = $"{noteId}/{audioId}.webm"; // Poprawna ścieżka do bloba w kontenerze
 
             var blobClient = _blobContainer.GetBlobClient(blobName);
 

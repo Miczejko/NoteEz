@@ -13,7 +13,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Ensure proper JSON serialization with camelCase naming
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.WriteIndented = false;
+    });
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -57,7 +63,7 @@ builder.Services.AddSingleton(sp =>
     var blobServiceClient = new BlobServiceClient(connectionString);
     var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
 
-    // upewnij siê, ¿e kontener istnieje (przydatne przy pierwszym uruchomieniu / na nowym œrodowisku)
+    // upewnij siï¿½, ï¿½e kontener istnieje (przydatne przy pierwszym uruchomieniu / na nowym ï¿½rodowisku)
     containerClient.CreateIfNotExists(PublicAccessType.None);
 
     return containerClient;
