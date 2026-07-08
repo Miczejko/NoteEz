@@ -119,6 +119,23 @@ namespace NoteEz_Server.Services
             return new NoteDrawingDto(drawing.Id, drawing.StrokesJson, drawing.SortOrder);
         }
 
+        public async Task<NoteDrawingDto> UpdateDrawingAsync(Guid userId, Guid noteId, Guid drawingId, string strokesJson)
+        {
+            var drawing = await _db.NoteDrawings
+                .Include(d => d.Note)
+                .FirstOrDefaultAsync(d => d.Id == drawingId
+                    && d.NoteId == noteId
+                    && d.Note.UserId == userId)
+                ?? throw new KeyNotFoundException("Rysunek nie znaleziony");
+
+            drawing.StrokesJson = strokesJson;
+            drawing.Note.UpdatedAt = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+
+            return new NoteDrawingDto(drawing.Id, drawing.StrokesJson, drawing.SortOrder);
+        }
+
         public async Task<bool> DeleteDrawingAsync(Guid userId, Guid noteId, Guid drawingId)
         {
             var drawing = await _db.NoteDrawings

@@ -75,11 +75,24 @@ export const useNotesStore = defineStore('notes', () => {
   async function addDrawing(noteId, strokesJson) {
     const { data } = await api.post(`/notes/${noteId}/drawings`, { strokesJson })
     if (currentNote.value?.id === noteId) {
-      // Ensure drawings array exists
       if (!currentNote.value.drawings) {
         currentNote.value.drawings = []
       }
       currentNote.value.drawings.push(data)
+    }
+    return data
+  }
+
+  async function updateDrawing(noteId, drawingId, strokesJson) {
+    const { data } = await api.put(`/notes/${noteId}/drawings/${drawingId}`, { strokesJson })
+    if (currentNote.value?.id === noteId) {
+      if (!currentNote.value.drawings) {
+        currentNote.value.drawings = []
+      }
+      const index = currentNote.value.drawings.findIndex((d) => d.id === drawingId)
+      if (index !== -1) {
+        currentNote.value.drawings[index] = data
+      }
     }
     return data
   }
@@ -130,6 +143,7 @@ export const useNotesStore = defineStore('notes', () => {
     update,
     remove,
     addDrawing,
+    updateDrawing,
     deleteDrawing,
     uploadAudio,
     deleteAudio,

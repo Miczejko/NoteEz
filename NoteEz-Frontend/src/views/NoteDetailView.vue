@@ -16,6 +16,7 @@ const textContent = ref('')
 const saving = ref(false)
 const showDrawing = ref(false)
 const activeTab = ref('text')
+const editingDrawingId = ref(null)
 
 const note = computed(() => notesStore.currentNote)
 
@@ -67,6 +68,22 @@ async function handleSaveDrawing(strokesJson) {
   await notesStore.addDrawing(note.value.id, strokesJson)
   showDrawing.value = false
   activeTab.value = 'drawings'
+}
+
+async function handleEditDrawing(drawingId) {
+  editingDrawingId.value = drawingId
+  showDrawing.value = true
+}
+
+async function handleUpdateDrawing(strokesJson) {
+  await notesStore.updateDrawing(note.value.id, editingDrawingId.value, strokesJson)
+  showDrawing.value = false
+  editingDrawingId.value = null
+}
+
+function handleCancelDrawing() {
+  showDrawing.value = false
+  editingDrawingId.value = null
 }
 
 async function handleDeleteDrawing(drawingId) {
@@ -143,25 +160,58 @@ async function handleDeleteAudio(audioId) {
       <div v-show="activeTab === 'drawings'" class="tab-content">
         <div class="section-header">
           <p class="section-title">Rysunki wektorowe</p>
-          <button class="btn btn-secondary btn-sm" @click="showDrawing = !showDrawing">
-            {{ showDrawing ? 'Anuluj' : '+ Nowy rysunek' }}
+          <button 
+            v-if="!showDrawing"
+            class="btn btn-secondary btn-sm" 
+            @click="showDrawing = true; editingDrawingId = null"
+          >
+            + Nowy rysunek
+          </button>
+          <button 
+            v-else
+            class="btn btn-ghost btn-sm" 
+            @click="handleCancelDrawing"
+          >
+            Anuluj
           </button>
         </div>
 
         <DrawingCanvas
-          v-if="showDrawing"
+          v-if="showDrawing && !editingDrawingId"
           @save="handleSaveDrawing"
         />
 
+        <DrawingCanvas
+          v-if="showDrawing && editingDrawingId"
+          :key="editingDrawingId"
+          :strokes-json="note.drawings?.find((d) => d.id === editingDrawingId)?.strokesJson"
+          @save="handleUpdateDrawing"
+        />
+
         <div v-if="note.drawings?.length" class="drawings-list">
-          <div v-for="drawing in note.drawings" :key="drawing.id" class="drawing-item card">
-            <DrawingCanvas :strokes-json="drawing.strokesJson" readonly />
-            <button
-              class="btn btn-ghost btn-sm delete-drawing"
-              @click="handleDeleteDrawing(drawing.id)"
-            >
-              Usuń rysunek
-            </button>
+          <div 
+            v-for="drawing in note.drawings" 
+            :key="drawing.id" 
+            class="drawing-item card"
+            :class="{ editing: editingDrawingId === drawing.id }"
+          >
+            <div v-if="editingDrawingId !== drawing.id" class="drawing-container">
+              <DrawingCanvas :strokes-json="drawing.strokesJson" readonly />
+              <div class="drawing-actions">
+                <button
+                  class="btn btn-secondary btn-sm"
+                  @click="handleEditDrawing(drawing.id)"
+                >
+                  ✎ Edytuj
+                </button>
+                <button
+                  class="btn btn-ghost btn-sm delete-drawing"
+                  @click="handleDeleteDrawing(drawing.id)"
+                >
+                  Usuń
+                </button>
+              </div>
+            </div>
           </div>
         </div>
         <p v-else-if="!showDrawing" class="empty-hint">Brak rysunków. Dodaj pierwszy!</p>
@@ -288,6 +338,24 @@ async function handleDeleteAudio(audioId) {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  max-width: fit-content;
+}
+
+.drawing-item.editing {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.drawing-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.drawing-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
 }
 
 .delete-drawing {

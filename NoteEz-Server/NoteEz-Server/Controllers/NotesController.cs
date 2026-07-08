@@ -66,6 +66,20 @@ namespace NoteEz_Server.Controllers
                 return NotFound();
             }
         }
+        [HttpPut("{noteId:guid}/drawings/{drawingId:guid}")]
+        public async Task<ActionResult<NoteDrawingDto>> UpdateDrawing(
+            Guid noteId, Guid drawingId, [FromBody] AddDrawingRequest req)
+        {
+            try
+            {
+                var result = await _notes.UpdateDrawingAsync(UserId, noteId, drawingId, req.StrokesJson);
+                return Ok(result);
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound();
+            }
+        }
 
         [HttpDelete("{id}/drawings/{drawingId}")]
         public async Task<IActionResult> DeleteDrawing(Guid id, Guid drawingId)

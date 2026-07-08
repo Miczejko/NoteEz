@@ -82,19 +82,23 @@ function resizeCanvas() {
   const canvas = canvasRef.value
   if (!canvas) return
   const container = canvas.parentElement
-  let width = container.clientWidth
-  // Ensure minimum width if parent container is too small or has no size
-  if (width < 100) {
-    width = 100
-    container.style.minWidth = '100px'
-  }
-  const height = Math.min(400, Math.max(250, width * 0.6))
+
+  // Get optimal dimensions based on drawing content
+  const { width, height, padding, bounds } = getOptimalCanvasDimensions()
+
+  // Set container size
+  container.style.width = `${width}px`
+  container.style.minWidth = `${width}px`
+
+  // Set canvas dimensions
   canvas.width = width
   canvas.height = height
   canvas.style.width = `${width}px`
   canvas.style.height = `${height}px`
+
   ctx = canvas.getContext('2d')
   isCanvasReady.value = true
+
   // Now that canvas is ready, redraw any loaded strokes
   redraw()
 }
@@ -146,6 +150,43 @@ function clear() {
 function save() {
   const json = JSON.stringify({ strokes: strokes.value })
   emit('save', json)
+}
+
+function calculateDrawingBounds(strokesList) {
+  if (!strokesList || strokesList.length === 0) {
+    return { minX: 0, minY: 0, maxX: 400, maxY: 250 }
+  }
+
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+
+  strokesList.forEach((stroke) => {
+    stroke.points.forEach((point) => {
+      minX = Math.min(minX, point.x)
+      minY = Math.min(minY, point.y)
+      maxX = Math.max(maxX, point.x)
+      maxY = Math.max(maxY, point.y)
+    })
+  })
+
+  // If no valid bounds found, use defaults
+  if (!isFinite(minX)) {
+    return { minX: 0, minY: 0, maxX: 400, maxY: 250 }
+  }
+
+  return { minX, minY, maxX, maxY }
+}
+
+function getOptimalCanvasDimensions() {
+  const bounds = calculateDrawingBounds(strokes.value)
+  const padding = 20 // Add padding around drawing
+
+  const width = Math.max(100, bounds.maxX - bounds.minX + padding * 2)
+  const height = Math.max(250, bounds.maxY - bounds.minY + padding * 2)
+
+  return { width, height, padding, bounds }
 }
 
 watch(
