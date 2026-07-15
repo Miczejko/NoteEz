@@ -35,6 +35,9 @@ namespace NoteEz_Server.Authentication
             if (device is null)
                 return AuthenticateResult.Fail("Nieprawidłowy klucz API.");
 
+            if (device.Revoked)
+                return AuthenticateResult.Fail("Urządzenie zostało odwołane.");
+
             device.LastSeenAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
 

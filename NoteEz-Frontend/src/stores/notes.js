@@ -126,12 +126,6 @@ export const useNotesStore = defineStore('notes', () => {
     }
   }
 
-  function getAudioStreamUrl(noteId, audioId) {
-    const base = import.meta.env.VITE_API_URL || '/api'
-    const token = localStorage.getItem('accessToken')
-    return `${base}/notes/${noteId}/audio/${audioId}/stream?token=${token}`
-  }
-
   return {
     notes,
     currentNote,
@@ -147,6 +141,5 @@ export const useNotesStore = defineStore('notes', () => {
     deleteDrawing,
     uploadAudio,
     deleteAudio,
-    getAudioStreamUrl,
   }
 })

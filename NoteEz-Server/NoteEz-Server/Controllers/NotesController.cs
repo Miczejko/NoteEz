@@ -10,7 +10,7 @@ namespace NoteEz_Server.Controllers
 
     [ApiController]
     [Route("api/notes")]
-    //[Authorize] // JWT
+    [Authorize] // JWT
     public class NotesController : ControllerBase
     {
         private readonly NoteService _notes;
@@ -22,8 +22,7 @@ namespace NoteEz_Server.Controllers
             _audio = audio;
         }
 
-        //private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        private Guid UserId => Guid.Parse("179EF867-8249-4556-9744-08DEDB4D8D36");
+        private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         // --- Notatka: tekst/tytuł ---
 
@@ -88,10 +87,29 @@ namespace NoteEz_Server.Controllers
 
         // --- Audio ---
 
+        private static readonly HashSet<string> AllowedAudioContentTypes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "audio/webm", "audio/ogg", "audio/opus", "audio/mpeg", "audio/mp4", "audio/wav", "audio/x-wav"
+        };
+        private const long MaxAudioFileSizeBytes = 20_000_000; // ~20MB, dopasuj do realnych rozmiarów głosówek
+
         [HttpPost("{id}/audio")]
-        [RequestSizeLimit(20_000_000)] // ~20MB, dopasuj do realnych rozmiarów głosówek
+        [RequestSizeLimit(MaxAudioFileSizeBytes)]
         public async Task<IActionResult> AddAudio(Guid id, IFormFile file, [FromForm] int durationSeconds)
         {
+            if (file is null || file.Length == 0)
+                return BadRequest(new { error = "Brak pliku audio." });
+
+            if (file.Length > MaxAudioFileSizeBytes)
+                return BadRequest(new { error = "Plik audio jest za duży." });
+
+            var mimeType = file.ContentType?.Split(';')[0].Trim();
+            if (string.IsNullOrWhiteSpace(mimeType) || !AllowedAudioContentTypes.Contains(mimeType))
+                return BadRequest(new { error = $"Nieobsługiwany typ pliku: {file.ContentType}" });
+
+            if (durationSeconds <= 0)
+                return BadRequest(new { error = "Nieprawidłowy czas trwania nagrania." });
+
             try
             {
                 await using var stream = file.OpenReadStream();

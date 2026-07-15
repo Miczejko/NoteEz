@@ -10,7 +10,7 @@ namespace NoteEz_Server.Controllers
 
     [ApiController]
     [Route("api/device-notes")]
-    //[Authorize(AuthenticationSchemes = "DeviceApiKey")]
+    [Authorize(AuthenticationSchemes = "DeviceApiKey")]
     public class DeviceNotesController : ControllerBase
     {
         private readonly NoteService _notes;
@@ -28,6 +28,7 @@ namespace NoteEz_Server.Controllers
             return note is null ? NotFound() : Ok(note);
         }
 
+        // Authorize in the future with device API key, but for now, we will allow any device to delete notes
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
             => await _notes.DeleteAsync(UserId, id) ? NoContent() : NotFound();

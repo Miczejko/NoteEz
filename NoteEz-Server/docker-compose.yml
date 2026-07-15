@@ -31,6 +31,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - AzureBlobStorage__ConnectionString=${AZURE_BLOB_CONNECTION_STRING}
       - AzureBlobStorage__ContainerName=${AZURE_BLOB_CONTAINER_NAME}
+      - Cors__AllowedOrigins__0=${CORS_ALLOWED_ORIGIN:-http://localhost:5173}
     ports:
       - "8080:8080"
 
