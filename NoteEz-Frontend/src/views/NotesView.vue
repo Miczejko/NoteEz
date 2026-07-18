@@ -35,9 +35,12 @@ async function handleCreate() {
     <div class="notes-page">
       <div class="page-header">
         <h1>Moje notatki</h1>
-        <button class="btn btn-primary" @click="showCreate = !showCreate">
-          {{ showCreate ? 'Anuluj' : '+ Nowa notatka' }}
-        </button>
+        <div class="page-header-actions">
+          <router-link to="/devices" class="btn btn-outline">📟 Urządzenia</router-link>
+          <button class="btn btn-primary" @click="showCreate = !showCreate">
+            {{ showCreate ? 'Anuluj' : '+ Nowa notatka' }}
+          </button>
+        </div>
       </div>
 
       <div v-if="showCreate" class="create-form card">
@@ -86,6 +89,13 @@ async function handleCreate() {
   color: var(--color-primary);
 }
 
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .create-form {
   display: flex;
   gap: 0.75rem;
@@ -125,6 +135,14 @@ async function handleCreate() {
 @media (max-width: 640px) {
   .page-header h1 {
     font-size: 1.25rem;
+  }
+
+  .page-header-actions {
+    width: 100%;
+  }
+
+  .page-header-actions .btn {
+    flex: 1;
   }
 
   .notes-grid {

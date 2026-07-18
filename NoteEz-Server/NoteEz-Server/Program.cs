@@ -68,6 +68,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddScoped<NoteService>();
 builder.Services.AddScoped<NoteAudioService>();
+builder.Services.AddScoped<DevicePairingService>();
 builder.Services.AddSingleton(sp =>
 {
     var connectionString = builder.Configuration["AzureBlobStorage:ConnectionString"];

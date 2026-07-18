@@ -26,6 +26,12 @@ const routes = [
     component: () => import('../views/NoteDetailView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/devices',
+    name: 'devices',
+    component: () => import('../views/DevicesView.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({
