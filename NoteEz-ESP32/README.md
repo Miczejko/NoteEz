@@ -8,7 +8,14 @@ Bazuje na `sketch_jul16a.ino` (konfiguracja LovyanGFX + WiFiManager + kalibracja
 - zapis `apiKey` i adresu serwera w NVS (`Preferences`), więc parowanie trzeba zrobić tylko raz,
 - ekran główny z listą notatek pobraną przez `X-Api-Key`,
 - przycisk „Odśwież” (odpytuje `/api/device-notes/lite` ponownie),
-- przycisk „Reset” (przytrzymanie ~2s kasuje zapisane Wi-Fi + parowanie i wraca do portalu konfiguracyjnego).
+- przycisk „Reset” (przytrzymanie ~2s kasuje zapisane Wi-Fi + parowanie i wraca do portalu konfiguracyjnego),
+- dotknięcie notatki na liście otwiera jej pełną treść (`GET /api/device-notes/{id}`) z zawijaniem tekstu i przewijaniem przyciskami „Góra”/„Dół”, gdy treść nie mieści się na ekranie.
+
+## Ekran szczegółów notatki
+
+Dotknięcie tytułu na liście pobiera pełną notatkę i pokazuje jej treść, zawiniętą do szerokości ekranu. Rysunki i głosówki nie są renderowane/odtwarzane na urządzeniu (zbyt mały ekran, brak głośnika) — zamiast tego widoczna jest informacja `[Rysunek - podglad tylko w apce]` / `[Glosowka - odtwarzanie tylko w apce]`, zgodnie z założeniem z [opis_projektu_notatnik.md](../opis_projektu_notatnik.md) („Rysunki wyświetlane jako 🖊 rysunek bez renderowania na ESP32”).
+
+Przyciski „Góra”/„Dół” w prawym dolnym rogu przewijają treść o pół strony; szarzeją, gdy przewijanie w danym kierunku nie jest już możliwe. Przycisk „< Wstecz” w lewym górnym rogu wraca do listy (bez ponownego pobierania — lista zostaje w pamięci do czasu ręcznego „Odśwież”).
 
 ## Wymagane biblioteki (Arduino Library Manager / PlatformIO)
 

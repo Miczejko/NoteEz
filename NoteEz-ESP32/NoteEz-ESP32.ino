@@ -4,6 +4,7 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>   // https://arduinojson.org
 #include <Preferences.h>
+#include <vector>
 
 class LGFX : public lgfx::LGFX_Device {
   lgfx::Panel_ST7789 _panel_instance;
@@ -57,7 +58,7 @@ String apiHost;      // np. "192.168.100.168:8080" - adres backendu w sieci loka
 // domyślny host używany tylko przy pierwszej konfiguracji (potem nadpisywany przez portal WiFiManager)
 #define DEFAULT_API_HOST "192.168.100.168:8080"
 
-// przycisk "Reset WiFi" w prawym górnym rogu - przytrzymanie go kasuje
+// przycisk "Reset WiFi" w prawym górnym rogu (ekran listy) - przytrzymanie go kasuje
 // zapisane dane WiFi + parowanie i wraca do portalu konfiguracyjnego
 #define RESET_BTN_X 260
 #define RESET_BTN_Y 0
@@ -65,14 +66,60 @@ String apiHost;      // np. "192.168.100.168:8080" - adres backendu w sieci loka
 #define RESET_BTN_H 32
 #define RESET_HOLD_MS 2000
 
-// przycisk "Odśwież" w lewym górnym rogu
+// przycisk "Odśwież" w lewym górnym rogu (ekran listy)
 #define REFRESH_BTN_X 0
 #define REFRESH_BTN_Y 0
 #define REFRESH_BTN_W 60
 #define REFRESH_BTN_H 32
 
+// przycisk "Wstecz" w lewym górnym rogu (ekran szczegółów notatki)
+#define BACK_BTN_X 0
+#define BACK_BTN_Y 0
+#define BACK_BTN_W 70
+#define BACK_BTN_H 32
+
+// przyciski przewijania tresci notatki (dol ekranu)
+#define SCROLL_UP_BTN_X 200
+#define SCROLL_DOWN_BTN_X 260
+#define SCROLL_BTN_Y 206
+#define SCROLL_BTN_W 55
+#define SCROLL_BTN_H 30
+
+
+
 WiFiManagerParameter* pairingCodeParam = nullptr;
 WiFiManagerParameter* apiHostParam = nullptr;
+
+// ---- lista notatek (GET /api/device-notes/lite) ----
+struct NoteLite {
+  String id;
+  String title;
+  bool hasDrawing;
+  bool hasAudio;
+};
+
+#define MAX_NOTES 20
+NoteLite notesList[MAX_NOTES];
+int notesCount = 0;
+
+#define LIST_START_Y 44
+#define LIST_ROW_HEIGHT 44
+#define LIST_CONTENT_BOTTOM 200 // ponizej tego zaczynaja sie przyciski scrolla listy
+int listScrollRow = 0; // indeks pierwszej widocznej notatki na liscie
+
+// ---- ekran szczegółów notatki ----
+enum Screen { SCREEN_LIST, SCREEN_DETAIL };
+Screen currentScreen = SCREEN_LIST;
+
+String detailTitle;
+bool detailHasDrawing = false;
+bool detailHasAudio = false;
+std::vector<String> detailLines;
+int detailScrollLine = 0;
+
+#define DETAIL_CONTENT_TOP 40
+#define DETAIL_LINE_HEIGHT 14
+#define DETAIL_CONTENT_BOTTOM 200 // ponizej tego zaczynaja sie przyciski scrolla
 
 // ---- proste komunikaty na ekranie ----
 void showMessage(const char* line1, const char* line2 = "", uint32_t color = TFT_BLACK) {
@@ -173,86 +220,6 @@ void resetWifiAndPairing() {
   ESP.restart();
 }
 
-// ---- pobiera i wyswietla liste notatek (GET /api/device-notes/lite) ----
-void fetchNotesLite() {
-  display.fillScreen(TFT_WHITE);
-  display.setTextColor(TFT_BLACK);
-  display.setTextSize(2);
-  display.setCursor(70, 6);
-  display.println("NOTATNIK");
-
-  drawTopButtons();
-
-  if (apiKey.length() == 0) {
-    display.setTextSize(1);
-    display.setCursor(10, 50);
-    display.println("Urzadzenie niesparowane.");
-    return;
-  }
-
-  HTTPClient http;
-  http.begin("http://" + apiHost + "/api/device-notes/lite");
-  http.addHeader("X-Api-Key", apiKey);
-  int status = http.GET();
-  String response = http.getString();
-  http.end();
-
-  display.setTextSize(1);
-
-  if (status != 200) {
-    display.setTextColor(TFT_RED);
-    display.setCursor(10, 50);
-    display.printf("Blad pobierania (HTTP %d)", status);
-    Serial.printf("device-notes/lite status=%d body=%s\n", status, response.c_str());
-    return;
-  }
-
-  JsonDocument doc;
-  if (deserializeJson(doc, response) != DeserializationError::Ok) {
-    display.setTextColor(TFT_RED);
-    display.setCursor(10, 50);
-    display.println("Blad odczytu listy notatek");
-    return;
-  }
-
-  JsonArray notes = doc.as<JsonArray>();
-  if (notes.size() == 0) {
-    display.setTextColor(TFT_BLACK);
-    display.setCursor(10, 50);
-    display.println("Brak notatek.");
-    return;
-  }
-
-  int y = 44;
-  const int rowHeight = 22;
-  const int maxRows = (display.height() - y) / rowHeight;
-  int row = 0;
-
-  for (JsonObject note : notes) {
-    if (row >= maxRows) break;
-
-    const char* title = note["title"] | "(bez tytulu)";
-    bool hasDrawing = note["hasDrawing"] | false;
-    bool hasAudio = note["hasAudio"] | false;
-
-    display.setTextColor(TFT_BLACK);
-    display.setCursor(10, y);
-    display.print(title);
-
-    String badges = "";
-    if (hasDrawing) badges += "[R]";
-    if (hasAudio) badges += "[A]";
-    if (badges.length() > 0) {
-      display.setTextColor(TFT_DARKGREEN);
-      display.setCursor(display.width() - 10 - badges.length() * 6, y);
-      display.print(badges);
-    }
-
-    y += rowHeight;
-    row++;
-  }
-}
-
 void drawTopButtons() {
   display.fillRect(REFRESH_BTN_X, REFRESH_BTN_Y, REFRESH_BTN_W, REFRESH_BTN_H, TFT_DARKGREEN);
   display.setTextColor(TFT_WHITE);
@@ -269,6 +236,19 @@ bool pointInRect(int32_t x, int32_t y, int rx, int ry, int rw, int rh) {
   return x >= rx && x <= rx + rw && y >= ry && y <= ry + rh;
 }
 
+// przyciski przewijania (dol ekranu) - wspolne dla listy notatek i widoku szczegolow
+void drawScrollButtons(bool canUp, bool canDown) {
+  display.fillRect(SCROLL_UP_BTN_X, SCROLL_BTN_Y, SCROLL_BTN_W, SCROLL_BTN_H, canUp ? TFT_DARKGREEN : TFT_LIGHTGREY);
+  display.setTextColor(TFT_WHITE);
+  display.setTextSize(1);
+  display.setCursor(SCROLL_UP_BTN_X + 14, SCROLL_BTN_Y + 11);
+  display.print("Gora");
+
+  display.fillRect(SCROLL_DOWN_BTN_X, SCROLL_BTN_Y, SCROLL_BTN_W, SCROLL_BTN_H, canDown ? TFT_DARKGREEN : TFT_LIGHTGREY);
+  display.setCursor(SCROLL_DOWN_BTN_X + 16, SCROLL_BTN_Y + 11);
+  display.print("Dol");
+}
+
 // usuwa przypadkowo wpisany prefiks "http(s)://" oraz koncowy "/" z pola adresu serwera,
 // zeby nie zbudowac zdublowanego URL typu "http://http://..." (przyczyna bledu HTTPC -1)
 String normalizeHost(String host) {
@@ -277,6 +257,299 @@ String normalizeHost(String host) {
   host.replace("https://", "");
   while (host.endsWith("/")) host.remove(host.length() - 1);
   return host;
+}
+
+int listRowsPerPage() {
+  return (LIST_CONTENT_BOTTOM - LIST_START_Y) / LIST_ROW_HEIGHT;
+}
+
+int listMaxScroll() {
+  int maxScroll = notesCount - listRowsPerPage();
+  return maxScroll > 0 ? maxScroll : 0;
+}
+
+void scrollList(int deltaRows) {
+  int maxScroll = listMaxScroll();
+  int newScroll = listScrollRow + deltaRows;
+  if (newScroll < 0) newScroll = 0;
+  if (newScroll > maxScroll) newScroll = maxScroll;
+  if (newScroll == listScrollRow) return;
+
+  listScrollRow = newScroll;
+  renderNotesList();
+}
+
+// ---- pobiera liste notatek (GET /api/device-notes/lite) i renderuje ekran listy ----
+void renderNotesList() {
+  currentScreen = SCREEN_LIST;
+  display.fillScreen(TFT_WHITE);
+  display.setTextColor(TFT_BLACK);
+  display.setTextSize(2);
+  display.setCursor(70, 6);
+  display.println("NOTATNIK");
+
+  drawTopButtons();
+  display.setTextSize(1);
+
+  if (apiKey.length() == 0) {
+    display.setCursor(10, 50);
+    display.println("Urzadzenie niesparowane.");
+    return;
+  }
+
+  if (notesCount == 0) {
+    display.setTextColor(TFT_BLACK);
+    display.setCursor(10, 50);
+    display.println("Brak notatek.");
+    return;
+  }
+
+  int perPage = listRowsPerPage();
+  int rows = min(perPage, notesCount - listScrollRow);
+  int y = LIST_START_Y;
+
+  for (int i = 0; i < rows; i++) {
+    int idx = listScrollRow + i;
+    int cardH = LIST_ROW_HEIGHT - 6;
+
+    // ramka wokol notatki, zeby bylo widac gdzie kliknac
+    display.drawRoundRect(6, y, display.width() - 12, cardH, 5, TFT_DARKGREY);
+
+    display.setTextColor(TFT_BLACK);
+    display.setTextSize(2);
+    display.setCursor(16, y + cardH / 2 - 8);
+    String shownTitle = notesList[idx].title;
+    if (shownTitle.length() > 18) shownTitle = shownTitle.substring(0, 17) + "..";
+    display.print(shownTitle);
+
+    String badges = "";
+    if (notesList[idx].hasDrawing) badges += "[R]";
+    if (notesList[idx].hasAudio) badges += "[A]";
+    if (badges.length() > 0) {
+      display.setTextSize(1);
+      display.setTextColor(TFT_DARKGREEN);
+      display.setCursor(display.width() - 16 - badges.length() * 6, y + cardH / 2 - 4);
+      display.print(badges);
+    }
+
+    y += LIST_ROW_HEIGHT;
+  }
+
+  bool canUp = listScrollRow > 0;
+  bool canDown = listScrollRow < listMaxScroll();
+  drawScrollButtons(canUp, canDown);
+}
+
+void fetchNotesLite() {
+  notesCount = 0;
+  listScrollRow = 0;
+
+  if (apiKey.length() == 0) {
+    renderNotesList();
+    return;
+  }
+
+  HTTPClient http;
+  http.begin("http://" + apiHost + "/api/device-notes/lite");
+  http.addHeader("X-Api-Key", apiKey);
+  int status = http.GET();
+  String response = http.getString();
+  http.end();
+
+  if (status != 200) {
+    Serial.printf("device-notes/lite status=%d body=%s\n", status, response.c_str());
+    renderNotesList();
+    display.setTextColor(TFT_RED);
+    display.setCursor(10, 50);
+    display.printf("Blad pobierania (HTTP %d)", status);
+    return;
+  }
+
+  JsonDocument doc;
+  if (deserializeJson(doc, response) != DeserializationError::Ok) {
+    renderNotesList();
+    display.setTextColor(TFT_RED);
+    display.setCursor(10, 50);
+    display.println("Blad odczytu listy notatek");
+    return;
+  }
+
+  JsonArray notes = doc.as<JsonArray>();
+  for (JsonObject note : notes) {
+    if (notesCount >= MAX_NOTES) break;
+    notesList[notesCount].id = note["id"].as<String>();
+    notesList[notesCount].title = String((const char*)(note["title"] | "(bez tytulu)"));
+    notesList[notesCount].hasDrawing = note["hasDrawing"] | false;
+    notesList[notesCount].hasAudio = note["hasAudio"] | false;
+    notesCount++;
+  }
+
+  renderNotesList();
+}
+
+// ---- dzieli tekst na linie mieszczace sie w szerokosci ekranu (zawijanie po slowach) ----
+std::vector<String> wrapText(const String& text, int charsPerLine) {
+  std::vector<String> lines;
+  int len = text.length();
+  int pStart = 0;
+
+  while (pStart <= len) {
+    int nl = text.indexOf('\n', pStart);
+    String paragraph = (nl == -1) ? text.substring(pStart) : text.substring(pStart, nl);
+
+    if (paragraph.length() == 0) {
+      lines.push_back("");
+    } else {
+      int i = 0;
+      int plen = paragraph.length();
+      while (i < plen) {
+        int remaining = plen - i;
+        int take = min(charsPerLine, remaining);
+        if (take < remaining) {
+          int breakAt = paragraph.lastIndexOf(' ', i + take - 1);
+          if (breakAt > i) take = breakAt - i;
+        }
+        String chunk = paragraph.substring(i, i + take);
+        chunk.trim();
+        lines.push_back(chunk);
+        i += take;
+        while (i < plen && paragraph[i] == ' ') i++;
+      }
+    }
+
+    if (nl == -1) break;
+    pStart = nl + 1;
+  }
+
+  if (lines.empty()) lines.push_back("");
+  return lines;
+}
+
+int detailLinesPerPage() {
+  return (DETAIL_CONTENT_BOTTOM - DETAIL_CONTENT_TOP) / DETAIL_LINE_HEIGHT;
+}
+
+int detailMaxScroll() {
+  int perPage = detailLinesPerPage();
+  int maxScroll = (int)detailLines.size() - perPage;
+  return maxScroll > 0 ? maxScroll : 0;
+}
+
+void drawDetailChrome() {
+  display.fillScreen(TFT_WHITE);
+
+  // naglowek z przyciskiem powrotu
+  display.fillRect(BACK_BTN_X, BACK_BTN_Y, BACK_BTN_W, BACK_BTN_H, TFT_DARKGREEN);
+  display.setTextColor(TFT_WHITE);
+  display.setTextSize(1);
+  display.setCursor(BACK_BTN_X + 6, BACK_BTN_Y + 12);
+  display.print("< Wstecz");
+
+  display.setTextColor(TFT_BLACK);
+  display.setTextSize(2);
+  display.setCursor(BACK_BTN_W + 10, 6);
+  String shownTitle = detailTitle;
+  if (shownTitle.length() > 16) shownTitle = shownTitle.substring(0, 15) + "..";
+  display.println(shownTitle);
+
+/*  Informacja o głosówkach i rysunkach (niepotrzebne aktualnie)
+  if (detailHasDrawing || detailHasAudio) {
+    display.setTextSize(1);
+    display.setCursor(10, DETAIL_CONTENT_TOP - 40);
+    display.setTextColor(TFT_DARKGREEN);
+    String badges = "";
+    if (detailHasDrawing) badges += "[Rysunek] ";
+    if (detailHasAudio) badges += "[Glosowka]";
+    display.print(badges);
+  }
+*/
+
+  drawScrollButtons(detailScrollLine > 0, detailScrollLine < detailMaxScroll());
+}
+
+void drawDetailContent() {
+  // czysci tylko obszar tresci, zeby nie przerysowywac naglowka/przyciskow przy scrollu
+  display.fillRect(0, DETAIL_CONTENT_TOP, display.width(), DETAIL_CONTENT_BOTTOM - DETAIL_CONTENT_TOP, TFT_WHITE);
+
+  display.setTextColor(TFT_BLACK);
+  display.setTextSize(1);
+
+  int perPage = detailLinesPerPage();
+  int y = DETAIL_CONTENT_TOP;
+
+  for (int i = 0; i < perPage; i++) {
+    int lineIdx = detailScrollLine + i;
+    if (lineIdx >= (int)detailLines.size()) break;
+    display.setCursor(10, y);
+    display.print(detailLines[lineIdx]);
+    y += DETAIL_LINE_HEIGHT;
+  }
+}
+
+void renderNoteDetail() {
+  currentScreen = SCREEN_DETAIL;
+  drawDetailChrome();
+  drawDetailContent();
+}
+
+void scrollDetail(int deltaLines) {
+  int maxScroll = detailMaxScroll();
+  int newScroll = detailScrollLine + deltaLines;
+  if (newScroll < 0) newScroll = 0;
+  if (newScroll > maxScroll) newScroll = maxScroll;
+  if (newScroll == detailScrollLine) return;
+
+  detailScrollLine = newScroll;
+  drawDetailContent();
+  // przyciski gora/dol moga zmienic kolor (aktywny/nieaktywny), wiec odswiez tez naglowek
+  drawDetailChrome();
+  drawDetailContent();
+}
+
+// ---- pobiera pelna tresc notatki (GET /api/device-notes/{id}) i pokazuje ekran szczegolow ----
+void selectNote(int index) {
+  if (index < 0 || index >= notesCount) return;
+
+  showMessage("Wczytywanie...", notesList[index].title.c_str());
+
+  HTTPClient http;
+  http.begin("http://" + apiHost + "/api/device-notes/" + notesList[index].id);
+  http.addHeader("X-Api-Key", apiKey);
+  int status = http.GET();
+  String response = http.getString();
+  http.end();
+
+  if (status != 200) {
+    Serial.printf("device-notes/{id} status=%d body=%s\n", status, response.c_str());
+    showMessage("Blad wczytywania", "Sprobuj ponownie", TFT_RED);
+    delay(2000);
+    renderNotesList();
+    return;
+  }
+
+  JsonDocument doc;
+  if (deserializeJson(doc, response) != DeserializationError::Ok) {
+    showMessage("Blad wczytywania", "Nieprawidlowa odpowiedz", TFT_RED);
+    delay(2000);
+    renderNotesList();
+    return;
+  }
+
+  detailTitle = String((const char*)(doc["title"] | "(bez tytulu)"));
+  String content = doc["textContent"].isNull() ? "" : doc["textContent"].as<String>();
+  detailHasDrawing = doc["drawings"].as<JsonArray>().size() > 0;
+  detailHasAudio = doc["audioClips"].as<JsonArray>().size() > 0;
+
+  if (content.length() == 0) {
+    content = "(notatka nie zawiera tekstu)";
+  }
+
+  // przy tekscie 1 (font ~6px szerokosci znaku) i marginesie 10px z kazdej strony
+  int charsPerLine = (display.width() - 20) / 6;
+  detailLines = wrapText(content, charsPerLine);
+  detailScrollLine = 0;
+
+  renderNoteDetail();
 }
 
 void setup() {
@@ -340,8 +613,17 @@ void setup() {
 void loop() {
   int32_t x, y;
   static uint32_t resetTouchStart = 0;
+  static uint32_t lastScrollTap = 0;
 
-  if (display.getTouch(&x, &y)) {
+  bool touched = display.getTouch(&x, &y);
+
+  if (!touched) {
+    resetTouchStart = 0;
+    delay(20);
+    return;
+  }
+
+  if (currentScreen == SCREEN_LIST) {
     if (pointInRect(x, y, REFRESH_BTN_X, REFRESH_BTN_Y, REFRESH_BTN_W, REFRESH_BTN_H)) {
       fetchNotesLite();
       delay(300); // debounce
@@ -353,12 +635,48 @@ void loop() {
       if (millis() - resetTouchStart >= RESET_HOLD_MS) {
         resetWifiAndPairing();
       }
-    } else {
-      resetTouchStart = 0;
+      delay(20);
+      return;
     }
-  } else {
     resetTouchStart = 0;
-  }
 
-  delay(20);
+    if (millis() - lastScrollTap > 180) { // debounce przewijania, ale pozwala trzymac palec
+      if (pointInRect(x, y, SCROLL_UP_BTN_X, SCROLL_BTN_Y, SCROLL_BTN_W, SCROLL_BTN_H)) {
+        scrollList(-1);
+        lastScrollTap = millis();
+        return;
+      } else if (pointInRect(x, y, SCROLL_DOWN_BTN_X, SCROLL_BTN_Y, SCROLL_BTN_W, SCROLL_BTN_H)) {
+        scrollList(1);
+        lastScrollTap = millis();
+        return;
+      }
+    }
+
+    // dotkniecie wiersza notatki (karty z ramka) -> szczegoly
+    if (y >= LIST_START_Y && y < LIST_CONTENT_BOTTOM) {
+      int rowInPage = (y - LIST_START_Y) / LIST_ROW_HEIGHT;
+      int index = listScrollRow + rowInPage;
+      if (rowInPage < listRowsPerPage() && index < notesCount) {
+        selectNote(index);
+        delay(300); // debounce
+        return;
+      }
+    }
+  } else { // SCREEN_DETAIL
+    if (pointInRect(x, y, BACK_BTN_X, BACK_BTN_Y, BACK_BTN_W, BACK_BTN_H)) {
+      renderNotesList();
+      delay(300); // debounce
+      return;
+    }
+
+    if (millis() - lastScrollTap > 180) { // debounce przewijania, ale pozwala trzymac palec
+      if (pointInRect(x, y, SCROLL_UP_BTN_X, SCROLL_BTN_Y, SCROLL_BTN_W, SCROLL_BTN_H)) {
+        scrollDetail(-detailLinesPerPage() / 2 - 1);
+        lastScrollTap = millis();
+      } else if (pointInRect(x, y, SCROLL_DOWN_BTN_X, SCROLL_BTN_Y, SCROLL_BTN_W, SCROLL_BTN_H)) {
+        scrollDetail(detailLinesPerPage() / 2 + 1);
+        lastScrollTap = millis();
+      }
+    }
+  }
 }
