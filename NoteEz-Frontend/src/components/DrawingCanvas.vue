@@ -20,6 +20,10 @@ const strokeWidth = ref(3)
 
 let ctx = null
 let lastPointTime = 0
+// Shift applied when rendering so the drawing's bounding box starts at
+// (padding, padding) instead of being clipped by the trimmed canvas size.
+let offsetX = 0
+let offsetY = 0
 
 function parseStrokes(json) {
   if (!json) return []
@@ -49,8 +53,8 @@ function getPos(e) {
   const clientX = e.touches ? e.touches[0].clientX : e.clientX
   const clientY = e.touches ? e.touches[0].clientY : e.clientY
   return {
-    x: (clientX - rect.left) * scaleX,
-    y: (clientY - rect.top) * scaleY,
+    x: (clientX - rect.left) * scaleX - offsetX,
+    y: (clientY - rect.top) * scaleY - offsetY,
   }
 }
 
@@ -74,8 +78,11 @@ function redraw() {
   ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height)
   ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, canvasRef.value.width, canvasRef.value.height)
+  ctx.save()
+  ctx.translate(offsetX, offsetY)
   strokes.value.forEach(drawStroke)
   if (currentStroke.value) drawStroke(currentStroke.value)
+  ctx.restore()
 }
 
 function resizeCanvas() {
@@ -83,18 +90,22 @@ function resizeCanvas() {
   if (!canvas) return
   const container = canvas.parentElement
 
-  // Get optimal dimensions based on drawing content
+  // Get optimal dimensions based on drawing content - this is the fixed
+  // drawing resolution (and the coordinate space strokes are stored in).
   const { width, height, padding, bounds } = getOptimalCanvasDimensions()
 
-  // Set container size
-  container.style.width = `${width}px`
-  container.style.minWidth = `${width}px`
-
-  // Set canvas dimensions
   canvas.width = width
   canvas.height = height
-  canvas.style.width = `${width}px`
-  canvas.style.height = `${height}px`
+  offsetX = padding - bounds.minX
+  offsetY = padding - bounds.minY
+
+  // Cap the display size at the natural resolution, but let it shrink to
+  // fit small screens instead of forcing the drawing off-screen.
+  container.style.width = `${width}px`
+  container.style.maxWidth = '100%'
+  canvas.style.width = '100%'
+  canvas.style.height = 'auto'
+  canvas.style.aspectRatio = `${width} / ${height}`
 
   ctx = canvas.getContext('2d')
   isCanvasReady.value = true

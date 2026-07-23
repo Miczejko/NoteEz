@@ -3,9 +3,9 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNotesStore } from '../stores/notes'
 import AppLayout from '../components/AppLayout.vue'
-import DrawingCanvas from '../components/DrawingCanvas.vue'
 import AudioRecorder from '../components/AudioRecorder.vue'
 import AudioPlayer from '../components/AudioPlayer.vue'
+import NoteEditor from '../components/NoteEditor.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -14,9 +14,7 @@ const notesStore = useNotesStore()
 const title = ref('')
 const textContent = ref('')
 const saving = ref(false)
-const showDrawing = ref(false)
 const activeTab = ref('text')
-const editingDrawingId = ref(null)
 
 const note = computed(() => notesStore.currentNote)
 
@@ -45,6 +43,11 @@ function scheduleSave() {
   saveTimeout = setTimeout(saveNote, 800)
 }
 
+function handleContentUpdate(json) {
+  textContent.value = json
+  scheduleSave()
+}
+
 async function saveNote() {
   if (!note.value) return
   saving.value = true
@@ -62,33 +65,6 @@ async function handleDelete() {
   if (!confirm('Czy na pewno chcesz usunąć tę notatkę?')) return
   await notesStore.remove(note.value.id)
   router.push({ name: 'notes' })
-}
-
-async function handleSaveDrawing(strokesJson) {
-  await notesStore.addDrawing(note.value.id, strokesJson)
-  showDrawing.value = false
-  activeTab.value = 'drawings'
-}
-
-async function handleEditDrawing(drawingId) {
-  editingDrawingId.value = drawingId
-  showDrawing.value = true
-}
-
-async function handleUpdateDrawing(strokesJson) {
-  await notesStore.updateDrawing(note.value.id, editingDrawingId.value, strokesJson)
-  showDrawing.value = false
-  editingDrawingId.value = null
-}
-
-function handleCancelDrawing() {
-  showDrawing.value = false
-  editingDrawingId.value = null
-}
-
-async function handleDeleteDrawing(drawingId) {
-  if (!confirm('Usunąć ten rysunek?')) return
-  await notesStore.deleteDrawing(note.value.id, drawingId)
 }
 
 async function handleRecorded({ blob, durationSeconds }) {
@@ -133,13 +109,6 @@ async function handleDeleteAudio(audioId) {
         </button>
         <button
           class="tab"
-          :class="{ active: activeTab === 'drawings' }"
-          @click="activeTab = 'drawings'"
-        >
-          Rysunki ({{ note.drawings?.length || 0 }})
-        </button>
-        <button
-          class="tab"
           :class="{ active: activeTab === 'audio' }"
           @click="activeTab = 'audio'"
         >
@@ -148,73 +117,12 @@ async function handleDeleteAudio(audioId) {
       </div>
 
       <div v-show="activeTab === 'text'" class="tab-content">
-        <textarea
-          v-model="textContent"
-          class="text-area input-field"
-          placeholder="Treść notatki…"
-          rows="10"
-          @input="scheduleSave"
+        <NoteEditor
+          :key="note.id"
+          :model-value="textContent"
+          :note-id="note.id"
+          @update:model-value="handleContentUpdate"
         />
-      </div>
-
-      <div v-show="activeTab === 'drawings'" class="tab-content">
-        <div class="section-header">
-          <p class="section-title">Rysunki wektorowe</p>
-          <button 
-            v-if="!showDrawing"
-            class="btn btn-secondary btn-sm" 
-            @click="showDrawing = true; editingDrawingId = null"
-          >
-            + Nowy rysunek
-          </button>
-          <button 
-            v-else
-            class="btn btn-ghost btn-sm" 
-            @click="handleCancelDrawing"
-          >
-            Anuluj
-          </button>
-        </div>
-
-        <DrawingCanvas
-          v-if="showDrawing && !editingDrawingId"
-          @save="handleSaveDrawing"
-        />
-
-        <DrawingCanvas
-          v-if="showDrawing && editingDrawingId"
-          :key="editingDrawingId"
-          :strokes-json="note.drawings?.find((d) => d.id === editingDrawingId)?.strokesJson"
-          @save="handleUpdateDrawing"
-        />
-
-        <div v-if="note.drawings?.length" class="drawings-list">
-          <div 
-            v-for="drawing in note.drawings" 
-            :key="drawing.id" 
-            class="drawing-item card"
-            :class="{ editing: editingDrawingId === drawing.id }"
-          >
-            <div v-if="editingDrawingId !== drawing.id" class="drawing-container">
-              <DrawingCanvas :strokes-json="drawing.strokesJson" readonly />
-              <div class="drawing-actions">
-                <button
-                  class="btn btn-secondary btn-sm"
-                  @click="handleEditDrawing(drawing.id)"
-                >
-                  ✎ Edytuj
-                </button>
-                <button
-                  class="btn btn-ghost btn-sm delete-drawing"
-                  @click="handleDeleteDrawing(drawing.id)"
-                >
-                  Usuń
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-        <p v-else-if="!showDrawing" class="empty-hint">Brak rysunków. Dodaj pierwszy!</p>
       </div>
 
       <div v-show="activeTab === 'audio'" class="tab-content">
@@ -312,55 +220,6 @@ async function handleDeleteAudio(audioId) {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-}
-
-.text-area {
-  min-height: 200px;
-  resize: vertical;
-  line-height: 1.6;
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.drawings-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.drawing-item {
-  padding: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  max-width: fit-content;
-}
-
-.drawing-item.editing {
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-.drawing-container {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.drawing-actions {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: flex-end;
-}
-
-.delete-drawing {
-  align-self: flex-end;
-  color: var(--color-danger);
 }
 
 .audio-list {

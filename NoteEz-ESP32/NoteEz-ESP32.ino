@@ -85,6 +85,12 @@ String apiHost;      // np. "192.168.100.168:8080" - adres backendu w sieci loka
 #define SCROLL_BTN_W 55
 #define SCROLL_BTN_H 30
 
+// przycisk "Rysunek" w prawym gornym rogu ekranu szczegolow (widoczny gdy notatka ma rysunki)
+#define DRAWING_BTN_X 270
+#define DRAWING_BTN_Y 0
+#define DRAWING_BTN_W 50
+#define DRAWING_BTN_H 32
+
 
 
 WiFiManagerParameter* pairingCodeParam = nullptr;
@@ -108,14 +114,26 @@ int notesCount = 0;
 int listScrollRow = 0; // indeks pierwszej widocznej notatki na liscie
 
 // ---- ekran szczegółów notatki ----
-enum Screen { SCREEN_LIST, SCREEN_DETAIL };
+enum Screen { SCREEN_LIST, SCREEN_DETAIL, SCREEN_DRAWING };
 Screen currentScreen = SCREEN_LIST;
+
+// jedna zawinieta linia tresci notatki, z minimalnym formatowaniem jakie potrafi wyswietlic ESP32
+struct DetailLine {
+  String text;
+  uint16_t color;
+  bool bold; // "pogrubienie" robione tanim trikiem: dwukrotny wydruk przesuniety o 1px
+};
 
 String detailTitle;
 bool detailHasDrawing = false;
 bool detailHasAudio = false;
-std::vector<String> detailLines;
+std::vector<DetailLine> detailLines;
 int detailScrollLine = 0;
+
+// pelny JSON ostatnio wczytanej notatki - trzymany zeby ekran rysunku mogl czytac drawings[]
+// bez ponownego zapytania do serwera
+JsonDocument detailDoc;
+int detailDrawingIndex = 0;
 
 #define DETAIL_CONTENT_TOP 40
 #define DETAIL_LINE_HEIGHT 14
@@ -169,10 +187,7 @@ bool claimDevice(const String& code) {
 
   String url = "http://" + apiHost + "/api/devices/claim";
   Serial.println("claim URL: " + url);
-
-  HTTPClient http;
-  http.begin(url);
-  http.addHeader("Content-Type", "application/json");
+  Serial.printf("WiFi status=%d mode=%d ip=%s\n", WiFi.status(), WiFi.getMode(), WiFi.localIP().toString().c_str());
 
   JsonDocument reqDoc;
   reqDoc["code"] = code;
@@ -180,9 +195,26 @@ bool claimDevice(const String& code) {
   String body;
   serializeJson(reqDoc, body);
 
-  int status = http.POST(body);
-  String response = http.getString();
-  http.end();
+  int status = -1;
+  String response;
+
+  // pierwsza proba tuz po polaczeniu z WiFi czasem konczy sie odmowa polaczenia
+  // (stos IP jeszcze sie nie ustabilizowal) - probujemy ponownie zanim zglosimy blad
+  for (int attempt = 0; attempt < 3 && status <= 0; attempt++) {
+    if (attempt > 0) {
+      Serial.printf("claim retry %d (poprzedni status=%d)\n", attempt, status);
+      delay(1000);
+    }
+
+    HTTPClient http;
+    http.setConnectTimeout(5000);
+    http.begin(url);
+    http.addHeader("Content-Type", "application/json");
+
+    status = http.POST(body);
+    response = http.getString();
+    http.end();
+  }
 
   if (status != 200) {
     showMessage("Blad parowania", response.c_str(), TFT_RED);
@@ -257,6 +289,16 @@ String normalizeHost(String host) {
   host.replace("https://", "");
   while (host.endsWith("/")) host.remove(host.length() - 1);
   return host;
+}
+
+// zamienia kolor tekstu "#rrggbb" (z edytora TipTap) na kolor RGB565 uzywany przez LovyanGFX
+uint16_t hexToColor565(const String& hex) {
+  if (hex.length() < 7 || hex[0] != '#') return TFT_BLACK;
+  long rgb = strtol(hex.c_str() + 1, nullptr, 16);
+  uint8_t r = (rgb >> 16) & 0xFF;
+  uint8_t g = (rgb >> 8) & 0xFF;
+  uint8_t b = rgb & 0xFF;
+  return display.color565(r, g, b);
 }
 
 int listRowsPerPage() {
@@ -449,20 +491,16 @@ void drawDetailChrome() {
   display.setTextSize(2);
   display.setCursor(BACK_BTN_W + 10, 6);
   String shownTitle = detailTitle;
-  if (shownTitle.length() > 16) shownTitle = shownTitle.substring(0, 15) + "..";
+  if (shownTitle.length() > 12) shownTitle = shownTitle.substring(0, 11) + "..";
   display.println(shownTitle);
 
-/*  Informacja o głosówkach i rysunkach (niepotrzebne aktualnie)
-  if (detailHasDrawing || detailHasAudio) {
+  if (detailHasDrawing) {
+    display.fillRect(DRAWING_BTN_X, DRAWING_BTN_Y, DRAWING_BTN_W, DRAWING_BTN_H, TFT_DARKGREEN);
+    display.setTextColor(TFT_WHITE);
     display.setTextSize(1);
-    display.setCursor(10, DETAIL_CONTENT_TOP - 40);
-    display.setTextColor(TFT_DARKGREEN);
-    String badges = "";
-    if (detailHasDrawing) badges += "[Rysunek] ";
-    if (detailHasAudio) badges += "[Glosowka]";
-    display.print(badges);
+    display.setCursor(DRAWING_BTN_X + 3, DRAWING_BTN_Y + 12);
+    display.print("Rys.");
   }
-*/
 
   drawScrollButtons(detailScrollLine > 0, detailScrollLine < detailMaxScroll());
 }
@@ -471,7 +509,6 @@ void drawDetailContent() {
   // czysci tylko obszar tresci, zeby nie przerysowywac naglowka/przyciskow przy scrollu
   display.fillRect(0, DETAIL_CONTENT_TOP, display.width(), DETAIL_CONTENT_BOTTOM - DETAIL_CONTENT_TOP, TFT_WHITE);
 
-  display.setTextColor(TFT_BLACK);
   display.setTextSize(1);
 
   int perPage = detailLinesPerPage();
@@ -480,8 +517,16 @@ void drawDetailContent() {
   for (int i = 0; i < perPage; i++) {
     int lineIdx = detailScrollLine + i;
     if (lineIdx >= (int)detailLines.size()) break;
+
+    const DetailLine& line = detailLines[lineIdx];
+    display.setTextColor(line.color);
     display.setCursor(10, y);
-    display.print(detailLines[lineIdx]);
+    display.print(line.text);
+    if (line.bold) {
+      // brak fontu pogrubionego w bibliotece - tani trik: drugi wydruk przesuniety o 1px
+      display.setCursor(11, y);
+      display.print(line.text);
+    }
     y += DETAIL_LINE_HEIGHT;
   }
 }
@@ -527,29 +572,132 @@ void selectNote(int index) {
     return;
   }
 
-  JsonDocument doc;
-  if (deserializeJson(doc, response) != DeserializationError::Ok) {
+  detailDoc.clear();
+  if (deserializeJson(detailDoc, response) != DeserializationError::Ok) {
     showMessage("Blad wczytywania", "Nieprawidlowa odpowiedz", TFT_RED);
     delay(2000);
     renderNotesList();
     return;
   }
 
-  detailTitle = String((const char*)(doc["title"] | "(bez tytulu)"));
-  String content = doc["textContent"].isNull() ? "" : doc["textContent"].as<String>();
-  detailHasDrawing = doc["drawings"].as<JsonArray>().size() > 0;
-  detailHasAudio = doc["audioClips"].as<JsonArray>().size() > 0;
-
-  if (content.length() == 0) {
-    content = "(notatka nie zawiera tekstu)";
-  }
+  detailTitle = String((const char*)(detailDoc["title"] | "(bez tytulu)"));
+  detailHasDrawing = detailDoc["drawings"].as<JsonArray>().size() > 0;
+  detailHasAudio = detailDoc["audioClips"].as<JsonArray>().size() > 0;
+  detailDrawingIndex = 0;
 
   // przy tekscie 1 (font ~6px szerokosci znaku) i marginesie 10px z kazdej strony
   int charsPerLine = (display.width() - 20) / 6;
-  detailLines = wrapText(content, charsPerLine);
+  detailLines.clear();
+
+  JsonArray blocksArr = detailDoc["textBlocks"].as<JsonArray>();
+  for (JsonObject block : blocksArr) {
+    String text = String((const char*)(block["text"] | ""));
+    if (text.length() == 0) continue;
+
+    String type = String((const char*)(block["type"] | "paragraph"));
+    bool bold = block["bold"] | false;
+
+    uint16_t color = TFT_BLACK;
+    if (!block["color"].isNull()) {
+      color = hexToColor565(String((const char*)block["color"]));
+    } else if (type == "blockquote") {
+      color = TFT_DARKGREY;
+    } else if (type == "codeBlock") {
+      color = TFT_NAVY;
+    }
+
+    String prefix = "";
+    if (type == "taskItem") {
+      bool checked = block["checked"] | false;
+      prefix = checked ? "[x] " : "[ ] ";
+    }
+
+    std::vector<String> wrapped = wrapText(prefix + text, charsPerLine);
+    for (auto& w : wrapped) {
+      detailLines.push_back({ w, color, bold });
+    }
+  }
+
+  if (detailLines.empty()) {
+    detailLines.push_back({ "(notatka nie zawiera tekstu)", TFT_BLACK, false });
+  }
   detailScrollLine = 0;
 
   renderNoteDetail();
+}
+
+// ---- ekran podgladu rysunku (wektorowego) przypietego do notatki ----
+// rysunki sa przechowywane jako lista pociagniec (linie miedzy punktami), nie jako bitmapy,
+// wiec renderujemy je wprost jako polaczone odcinki przeskalowane pod rozmiar ekranu
+void renderDrawingScreen(int index) {
+  currentScreen = SCREEN_DRAWING;
+  display.fillScreen(TFT_WHITE);
+
+  display.fillRect(BACK_BTN_X, BACK_BTN_Y, BACK_BTN_W, BACK_BTN_H, TFT_DARKGREEN);
+  display.setTextColor(TFT_WHITE);
+  display.setTextSize(1);
+  display.setCursor(BACK_BTN_X + 6, BACK_BTN_Y + 12);
+  display.print("< Wstecz");
+
+  JsonArray drawings = detailDoc["drawings"].as<JsonArray>();
+  if (index < 0 || index >= (int)drawings.size()) return;
+
+  if (drawings.size() > 1) {
+    display.setTextColor(TFT_DARKGREY);
+    display.setCursor(display.width() - 60, 12);
+    display.printf("%d/%d (dotknij)", index + 1, (int)drawings.size());
+  }
+
+  String strokesJson = String((const char*)(drawings[index]["strokesJson"] | ""));
+  if (strokesJson.length() == 0) return;
+
+  JsonDocument strokesDoc;
+  if (deserializeJson(strokesDoc, strokesJson) != DeserializationError::Ok) return;
+  JsonArray strokes = strokesDoc["strokes"].as<JsonArray>();
+
+  // granice rysunku w oryginalnych wspolrzednych (przestrzen canvasu w przegladarce)
+  float minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+  for (JsonObject stroke : strokes) {
+    for (JsonObject pt : stroke["points"].as<JsonArray>()) {
+      float px = pt["x"] | 0.0f;
+      float py = pt["y"] | 0.0f;
+      minX = min(minX, px); maxX = max(maxX, px);
+      minY = min(minY, py); maxY = max(maxY, py);
+    }
+  }
+  if (maxX < minX) return; // brak punktow
+
+  float srcW = max(1.0f, maxX - minX);
+  float srcH = max(1.0f, maxY - minY);
+
+  int areaTop = 40;
+  int areaBottom = display.height() - 10;
+  int areaW = display.width() - 20;
+  int areaH = areaBottom - areaTop;
+
+  float scale = min((float)areaW / srcW, (float)areaH / srcH);
+  float offsetX = 10 + (areaW - srcW * scale) / 2 - minX * scale;
+  float offsetY = areaTop + (areaH - srcH * scale) / 2 - minY * scale;
+
+  for (JsonObject stroke : strokes) {
+    JsonArray points = stroke["points"].as<JsonArray>();
+    if (points.size() < 2) continue;
+
+    uint16_t color = hexToColor565(String((const char*)(stroke["color"] | "#000000")));
+
+    float prevX = 0, prevY = 0;
+    bool hasPrev = false;
+    for (JsonObject pt : points) {
+      float px = (float)(pt["x"] | 0.0f) * scale + offsetX;
+      float py = (float)(pt["y"] | 0.0f) * scale + offsetY;
+      if (hasPrev) {
+        display.drawLine((int)prevX, (int)prevY, (int)px, (int)py, color);
+      }
+      prevX = px;
+      prevY = py;
+      hasPrev = true;
+    }
+  }
 }
 
 void setup() {
@@ -587,6 +735,12 @@ void setup() {
     delay(3000);
     ESP.restart();
   }
+
+  // WiFiManager po konfiguracji przez portal (AP) czasem zostawia urzadzenie w trybie
+  // WIFI_AP_STA (softAP + stacja jednoczesnie), co potrafi psuc wychodzace polaczenia
+  // HTTPClient (blad -1 "connection refused") mimo ze sieć jest ok. Wymuszamy czysty tryb STA.
+  WiFi.mode(WIFI_STA);
+  delay(200);
 
   // host mogl zostac zmieniony w portalu konfiguracyjnym
   String hostFromPortal = normalizeHost(String(apiHostParam->getValue()));
@@ -662,9 +816,16 @@ void loop() {
         return;
       }
     }
-  } else { // SCREEN_DETAIL
+  } else if (currentScreen == SCREEN_DETAIL) {
     if (pointInRect(x, y, BACK_BTN_X, BACK_BTN_Y, BACK_BTN_W, BACK_BTN_H)) {
       renderNotesList();
+      delay(300); // debounce
+      return;
+    }
+
+    if (detailHasDrawing && pointInRect(x, y, DRAWING_BTN_X, DRAWING_BTN_Y, DRAWING_BTN_W, DRAWING_BTN_H)) {
+      detailDrawingIndex = 0;
+      renderDrawingScreen(detailDrawingIndex);
       delay(300); // debounce
       return;
     }
@@ -677,6 +838,22 @@ void loop() {
         scrollDetail(detailLinesPerPage() / 2 + 1);
         lastScrollTap = millis();
       }
+    }
+  } else { // SCREEN_DRAWING
+    if (pointInRect(x, y, BACK_BTN_X, BACK_BTN_Y, BACK_BTN_W, BACK_BTN_H)) {
+      renderNoteDetail();
+      delay(300); // debounce
+      return;
+    }
+
+    int drawingCount = detailDoc["drawings"].as<JsonArray>().size();
+    if (drawingCount > 1 && y > BACK_BTN_H && millis() - lastScrollTap > 300) {
+      // dotkniecie lewej/prawej polowy ekranu (ponizej gornego paska) przelacza rysunek
+      detailDrawingIndex = (x < display.width() / 2)
+        ? (detailDrawingIndex - 1 + drawingCount) % drawingCount
+        : (detailDrawingIndex + 1) % drawingCount;
+      renderDrawingScreen(detailDrawingIndex);
+      lastScrollTap = millis();
     }
   }
 }

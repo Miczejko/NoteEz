@@ -1,7 +1,12 @@
 <script setup>
-defineProps({
+import { computed } from 'vue'
+import { tiptapToPlainText } from '../utils/tiptapText'
+
+const props = defineProps({
   note: { type: Object, required: true },
 })
+
+const previewText = computed(() => tiptapToPlainText(props.note.textContent))
 
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('pl-PL', {
@@ -20,7 +25,7 @@ function formatDate(dateStr) {
       <h3 class="note-title">{{ note.title || 'Bez tytułu' }}</h3>
       <time class="note-date">{{ formatDate(note.updatedAt) }}</time>
     </div>
-    <p v-if="note.textContent" class="note-preview">{{ note.textContent }}</p>
+    <p v-if="previewText" class="note-preview">{{ previewText }}</p>
     <div class="note-badges">
       <span v-if="note.drawings?.length" class="badge badge-drawing">🖊 Rysunek</span>
       <span v-if="note.audioClips?.length" class="badge badge-audio">🎙 Głosówka</span>
