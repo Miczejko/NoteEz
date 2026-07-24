@@ -1,6 +1,7 @@
 ﻿using Azure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using NoteEz_Server.Data;
@@ -14,6 +15,7 @@ namespace NoteEz_Server.Controllers
 {
     [ApiController]
     [Route("api/auth")]
+    [EnableRateLimiting("auth")]
     public class AuthController : ControllerBase
     {
         private readonly AppDbContext _db;
@@ -41,11 +43,18 @@ namespace NoteEz_Server.Controllers
             return Ok();
         }
 
+        // hash "placebo" uzywany, gdy uzytkownik nie istnieje - BCrypt.Verify zajmuje wtedy
+        // tyle samo czasu co dla istniejacego konta, zeby czas odpowiedzi nie zdradzal,
+        // czy dana nazwa uzytkownika jest zarejestrowana (username enumeration przez timing)
+        private const string DummyPasswordHash = "$2a$11$CwTycUXWue0Thq9StjUM0uJ8lqM8L.ku1XdCz4CQ9Mzp2j5c2K5C.";
+
         [HttpPost("login")]
         public async Task<IActionResult> Login(LoginDto dto)
         {
             var user = await _db.Users.SingleOrDefaultAsync(u => u.Username == dto.Username);
-            if (user is null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
+            var passwordOk = BCrypt.Net.BCrypt.Verify(dto.Password, user?.PasswordHash ?? DummyPasswordHash);
+
+            if (user is null || !passwordOk)
                 return Unauthorized();
 
             var accessToken = GenerateAccessToken(user);
@@ -59,10 +68,63 @@ namespace NoteEz_Server.Controllers
                 Expires = DateTimeOffset.UtcNow.AddDays(7)
             });
 
-            Console.WriteLine($"User {user.Username} logged in. Access token: {accessToken}, Refresh token: {refreshToken}");
-            Console.WriteLine($"Claims: {string.Join(", ", User.Claims.Select(c => $"{c.Type}: {c.Value}"))}");
-
             return Ok(new { accessToken });
+        }
+
+        [HttpPost("refresh")]
+        public async Task<IActionResult> Refresh()
+        {
+            var rawToken = Request.Cookies["refreshToken"];
+            if (string.IsNullOrEmpty(rawToken))
+                return Unauthorized();
+
+            var hash = Sha256(rawToken);
+            var stored = await _db.RefreshTokens.FirstOrDefaultAsync(t => t.TokenHash == hash);
+
+            if (stored is null || stored.ExpiresAt <= DateTime.UtcNow)
+            {
+                Response.Cookies.Delete("refreshToken");
+                return Unauthorized();
+            }
+
+            if (stored.RevokedAt != null)
+            {
+                // token juz raz zuzyty/uniewazniony wraca ponownie - to sygnal kradziezy
+                // (np. skopiowany zanim wlasciciel go zuzyl). Uniewazniamy WSZYSTKIE sesje
+                // tego uzytkownika, zeby wymusic ponowne logowanie wszedzie.
+                var allActive = await _db.RefreshTokens
+                    .Where(t => t.UserId == stored.UserId && t.RevokedAt == null)
+                    .ToListAsync();
+                foreach (var t in allActive) t.RevokedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+
+                Response.Cookies.Delete("refreshToken");
+                return Unauthorized();
+            }
+
+            var user = await _db.Users.FindAsync(stored.UserId);
+            if (user is null)
+            {
+                Response.Cookies.Delete("refreshToken");
+                return Unauthorized();
+            }
+
+            // rotacja: stary refresh token natychmiast przestaje dzialac, wydajemy nowy
+            var newRefreshToken = await GenerateAndStoreRefreshToken(user.Id);
+            stored.RevokedAt = DateTime.UtcNow;
+            stored.ReplacedByTokenHash = Sha256(newRefreshToken);
+            await _db.SaveChangesAsync();
+
+            Response.Cookies.Append("refreshToken", newRefreshToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTimeOffset.UtcNow.AddDays(7)
+            });
+
+            var accessToken = GenerateAccessToken(user);
+            return Ok(new { accessToken, username = user.Username });
         }
 
         [HttpPost("logout")]

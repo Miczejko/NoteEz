@@ -13,14 +13,20 @@ const confirmPassword = ref('')
 const error = ref('')
 const loading = ref(false)
 
+const USERNAME_PATTERN = /^[a-zA-Z0-9_.-]{3,32}$/
+
 async function handleSubmit() {
   error.value = ''
-  if (password.value !== confirmPassword.value) {
-    error.value = 'Hasła nie są identyczne'
+  if (!USERNAME_PATTERN.test(username.value)) {
+    error.value = 'Nazwa użytkownika: 3-32 znaki, tylko litery, cyfry, "_", "." i "-"'
     return
   }
-  if (password.value.length < 6) {
-    error.value = 'Hasło musi mieć co najmniej 6 znaków'
+  if (password.value.length < 8 || password.value.length > 100) {
+    error.value = 'Hasło musi mieć od 8 do 100 znaków'
+    return
+  }
+  if (password.value !== confirmPassword.value) {
+    error.value = 'Hasła nie są identyczne'
     return
   }
   loading.value = true
@@ -29,7 +35,16 @@ async function handleSubmit() {
     await auth.login(username.value, password.value)
     router.push({ name: 'notes' })
   } catch (e) {
-    error.value = e.response?.data || 'Rejestracja nie powiodła się'
+    const data = e.response?.data
+    if (typeof data === 'string') {
+      error.value = data
+    } else if (data?.errors) {
+      error.value = Object.values(data.errors).flat().join(' ')
+    } else if (e.response?.status === 409) {
+      error.value = 'Użytkownik o tej nazwie już istnieje'
+    } else {
+      error.value = 'Rejestracja nie powiodła się'
+    }
   } finally {
     loading.value = false
   }
@@ -56,6 +71,9 @@ async function handleSubmit() {
               type="text"
               class="input-field"
               autocomplete="username"
+              minlength="3"
+              maxlength="32"
+              pattern="[a-zA-Z0-9_.\-]+"
               required
             />
           </div>
@@ -67,6 +85,8 @@ async function handleSubmit() {
               type="password"
               class="input-field"
               autocomplete="new-password"
+              minlength="8"
+              maxlength="100"
               required
             />
           </div>
@@ -78,6 +98,8 @@ async function handleSubmit() {
               type="password"
               class="input-field"
               autocomplete="new-password"
+              minlength="8"
+              maxlength="100"
               required
             />
           </div>

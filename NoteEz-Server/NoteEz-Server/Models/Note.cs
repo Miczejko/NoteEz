@@ -29,10 +29,27 @@ namespace NoteEz_Server.Models
         IReadOnlyList<NoteAudioDto> AudioClips
     );
 
-    public record NoteLiteDto(Guid Id, string Title, bool HasDrawing, bool HasAudio);
+    public record NoteLiteDto(Guid Id, string Title, bool HasDrawing, bool HasAudio, string? Color);
 
-    public record CreateNoteRequest(string Title, string? TextContent, string? Color);
-    public record UpdateNoteRequest(string? Title, string? TextContent, string? Color);
-    public record AddDrawingRequest(string StrokesJson);
-    public record ReorderRequest(List<Guid> OrderedIds);
+    public record CreateNoteRequest(
+        [Required, StringLength(200, MinimumLength = 1)]
+        string Title,
+        [StringLength(200_000)]
+        string? TextContent,
+        [RegularExpression(@"^#[0-9a-fA-F]{6}$")]
+        string? Color);
+
+    public record UpdateNoteRequest(
+        [StringLength(200)]
+        string? Title,
+        [StringLength(200_000)]
+        string? TextContent,
+        [RegularExpression(@"^(#[0-9a-fA-F]{6})?$")]
+        string? Color);
+
+    public record AddDrawingRequest(
+        [Required, StringLength(2_000_000)]
+        string StrokesJson);
+
+    public record ReorderRequest([Required] List<Guid> OrderedIds);
 }

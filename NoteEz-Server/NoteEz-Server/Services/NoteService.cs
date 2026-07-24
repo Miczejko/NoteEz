@@ -57,7 +57,8 @@ namespace NoteEz_Server.Services
                     n.Id,
                     n.Title,
                     n.Drawings.Any(),
-                    n.AudioClips.Any()))
+                    n.AudioClips.Any(),
+                    n.Color))
                 .ToListAsync();
         }
 
@@ -76,7 +77,7 @@ namespace NoteEz_Server.Services
             var note = await _db.Notes.FirstOrDefaultAsync(n => n.Id == noteId && n.UserId == userId);
             if (note is null) return false;
 
-            if (req.Title is not null) note.Title = req.Title;
+            if (req.Title is not null) note.Title = string.IsNullOrWhiteSpace(req.Title) ? "Bez tytułu" : req.Title;
             if (req.TextContent is not null) note.TextContent = req.TextContent;
             if (req.Color is not null) note.Color = req.Color.Length == 0 ? null : req.Color;
             note.UpdatedAt = DateTime.UtcNow;

@@ -113,6 +113,17 @@ namespace NoteEz_Server.Controllers
             try
             {
                 await using var stream = file.OpenReadStream();
+
+                // Content-Type z formularza to tylko deklaracja klienta - sprawdzamy tez
+                // rzeczywisty naglowek pliku, zeby nie przyjac np. .html/.exe podszywajacego
+                // sie pod audio/webm.
+                var header = new byte[AudioSignatureValidator.RequiredHeaderBytes];
+                var read = await stream.ReadAsync(header.AsMemory(0, header.Length));
+                stream.Position = 0;
+
+                if (read < 4 || !AudioSignatureValidator.IsRecognizedAudioContainer(header.AsSpan(0, read)))
+                    return BadRequest(new { error = "Zawartość pliku nie wygląda na obsługiwane audio." });
+
                 var dto = await _audio.AddAsync(UserId, id, stream, file.ContentType, file.Length, durationSeconds);
                 return Ok(dto);
             }

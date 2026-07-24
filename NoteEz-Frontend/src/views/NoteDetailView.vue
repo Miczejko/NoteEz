@@ -107,6 +107,7 @@ async function handleDeleteAudio(audioId) {
         type="text"
         class="title-input"
         placeholder="Tytuł notatki"
+        maxlength="200"
         @input="scheduleSave"
       />
 

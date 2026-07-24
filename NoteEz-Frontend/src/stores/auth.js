@@ -40,5 +40,14 @@ export const useAuthStore = defineStore('auth', () => {
     clearSession()
   }
 
-  return { accessToken, username, isAuthenticated, register, login, logout }
+  // Wymienia refresh-token cookie na nowy access token. Wolane przez interceptor
+  // w api/client.js po kazdym 401, zeby uzytkownik nie musial sie logowac ponownie
+  // co 30 minut (tyle zyje access token).
+  async function refresh() {
+    const { data } = await api.post('/auth/refresh')
+    setSession(data.accessToken, data.username)
+    return data.accessToken
+  }
+
+  return { accessToken, username, isAuthenticated, register, login, logout, refresh }
 })

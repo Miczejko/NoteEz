@@ -20,6 +20,8 @@ const colors = [
 ]
 const selectedColor = ref(colors[0])
 const strokeWidth = ref(3)
+const tool = ref('draw') // 'draw' | 'erase'
+const eraserSize = ref(24)
 
 let ctx = null
 let lastPointTime = 0
@@ -117,11 +119,45 @@ function resizeCanvas() {
   redraw()
 }
 
+function distToSegment(p, a, b) {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const lengthSq = dx * dx + dy * dy
+  if (lengthSq === 0) return Math.hypot(p.x - a.x, p.y - a.y)
+  let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSq
+  t = Math.max(0, Math.min(1, t))
+  const projX = a.x + t * dx
+  const projY = a.y + t * dy
+  return Math.hypot(p.x - projX, p.y - projY)
+}
+
+function strokeHit(stroke, pos, radius) {
+  const threshold = radius + stroke.width / 2
+  if (stroke.points.length < 2) {
+    return Math.hypot(pos.x - stroke.points[0].x, pos.y - stroke.points[0].y) <= threshold
+  }
+  for (let i = 1; i < stroke.points.length; i++) {
+    if (distToSegment(pos, stroke.points[i - 1], stroke.points[i]) <= threshold) return true
+  }
+  return false
+}
+
+function eraseAt(pos) {
+  const before = strokes.value.length
+  strokes.value = strokes.value.filter((stroke) => !strokeHit(stroke, pos, eraserSize.value / 2))
+  if (strokes.value.length !== before) redraw()
+}
+
 function startDraw(e) {
   if (props.readonly) return
   e.preventDefault()
-  isDrawing.value = true
   const pos = getPos(e)
+  if (tool.value === 'erase') {
+    isDrawing.value = true
+    eraseAt(pos)
+    return
+  }
+  isDrawing.value = true
   currentStroke.value = {
     color: selectedColor.value,
     width: strokeWidth.value,
@@ -131,20 +167,25 @@ function startDraw(e) {
 }
 
 function moveDraw(e) {
-  if (!isDrawing.value || !currentStroke.value) return
+  if (!isDrawing.value) return
   e.preventDefault()
+  const pos = getPos(e)
+  if (tool.value === 'erase') {
+    eraseAt(pos)
+    return
+  }
+  if (!currentStroke.value) return
   const now = Date.now()
   if (now - lastPointTime < 16) return
   lastPointTime = now
-  const pos = getPos(e)
   currentStroke.value.points.push(pos)
   redraw()
 }
 
 function endDraw() {
-  if (!isDrawing.value || !currentStroke.value) return
+  if (!isDrawing.value) return
   isDrawing.value = false
-  if (currentStroke.value.points.length >= 2) {
+  if (currentStroke.value && currentStroke.value.points.length >= 2) {
     strokes.value.push({ ...currentStroke.value })
   }
   currentStroke.value = null
@@ -244,10 +285,33 @@ onUnmounted(() => {
           <input type="color" :value="selectedColor" @input="selectedColor = $event.target.value" />
         </label>
       </div>
-      <div class="width-picker">
+      <div class="width-picker" v-if="tool === 'draw'">
         <label>Szerokość:</label>
         <input v-model.number="strokeWidth" type="range" min="1" max="12" />
         <span>{{ strokeWidth }}px</span>
+      </div>
+      <div class="width-picker" v-else>
+        <label>Rozmiar gumki:</label>
+        <input v-model.number="eraserSize" type="range" min="10" max="60" />
+        <span>{{ eraserSize }}px</span>
+      </div>
+      <div class="tool-picker">
+        <button
+          class="btn btn-sm"
+          :class="tool === 'draw' ? 'btn-accent' : 'btn-ghost'"
+          title="Rysuj"
+          @click="tool = 'draw'"
+        >
+          ✏️ Rysuj
+        </button>
+        <button
+          class="btn btn-sm"
+          :class="tool === 'erase' ? 'btn-accent' : 'btn-ghost'"
+          title="Gumka"
+          @click="tool = 'erase'"
+        >
+          🧹 Gumka
+        </button>
       </div>
       <div class="toolbar-actions">
         <button class="btn btn-ghost btn-sm" @click="undo" :disabled="!strokes.length">Cofnij</button>
@@ -259,7 +323,7 @@ onUnmounted(() => {
       <canvas
         ref="canvasRef"
         class="canvas"
-        :class="{ readonly }"
+        :class="{ readonly, erasing: tool === 'erase' && !readonly }"
         @mousedown="startDraw"
         @mousemove="moveDraw"
         @mouseup="endDraw"
@@ -353,6 +417,11 @@ onUnmounted(() => {
   accent-color: var(--color-primary);
 }
 
+.tool-picker {
+  display: flex;
+  gap: 0.375rem;
+}
+
 .toolbar-actions {
   display: flex;
   gap: 0.375rem;
@@ -375,6 +444,10 @@ onUnmounted(() => {
 
 .canvas.readonly {
   cursor: default;
+}
+
+.canvas.erasing {
+  cursor: cell;
 }
 
 @media (max-width: 640px) {

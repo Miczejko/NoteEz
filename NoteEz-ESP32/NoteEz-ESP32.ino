@@ -51,6 +51,28 @@ LGFX display;
 WiFiManager wm;
 Preferences prefs;
 
+// ---- kolorystyka dopasowana do motywu strony (NoteEz-Frontend/src/assets/main.css) ----
+// UWAGA: musza to byc stale typu uint16_t (nie #define/int), bo LovyanGFX przeciażza
+// funkcje rysujace wg typu argumentu - "int" trafia w przeciażenie dla surowego RGB888
+// i przekopakowuje juz spakowane bity 565, co psuje kolory (czerwony wychodzi zielony itp.)
+constexpr uint16_t RGB565(uint8_t r, uint8_t g, uint8_t b) {
+  return (uint16_t)(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3));
+}
+
+const uint16_t COLOR_BG          = RGB565(0, 5, 1);       // --color-bg / --black
+const uint16_t COLOR_SURFACE     = RGB565(12, 21, 18);    // --color-surface
+const uint16_t COLOR_BORDER      = RGB565(30, 47, 40);    // --color-border
+const uint16_t COLOR_TEXT        = RGB565(234, 245, 240); // --color-text
+const uint16_t COLOR_TEXT_MUTED  = RGB565(147, 172, 162); // --color-text-muted
+const uint16_t COLOR_PRIMARY     = RGB565(121, 199, 197); // --color-primary / pearl-aqua
+const uint16_t COLOR_SECONDARY   = RGB565(115, 171, 132); // --color-secondary / muted-teal
+const uint16_t COLOR_ACCENT_MINT = RGB565(153, 209, 156); // --color-accent-mint / celadon
+const uint16_t COLOR_DANGER      = RGB565(224, 118, 110); // --color-danger
+const uint16_t COLOR_ON_ACCENT   = COLOR_BG;              // --color-on-accent (ciemny tekst na jasnym przycisku)
+const uint16_t COLOR_RESET       = RGB565(235, 5, 5);     // czerwony przycisk resetu WiFi
+const uint16_t COLOR_BRIGHT_TEXT = RGB565(255, 255, 255); // jasniejszy naglowek "NOTATNIK" / tytuly notatek
+const uint16_t COLOR_CARD_GREY   = RGB565(52, 52, 56);    // szare tlo kafelka notatki na liscie
+
 // ---- konfiguracja zapisywana w NVS (Preferences) ----
 String apiKey;      // klucz API urządzenia, pusty dopóki nie sparowane
 String apiHost;      // np. "192.168.100.168:8080" - adres backendu w sieci lokalnej
@@ -102,6 +124,7 @@ struct NoteLite {
   String title;
   bool hasDrawing;
   bool hasAudio;
+  String color; // np. "#8963ba", puste gdy notatka nie ma wybranego koloru
 };
 
 #define MAX_NOTES 20
@@ -140,8 +163,8 @@ int detailDrawingIndex = 0;
 #define DETAIL_CONTENT_BOTTOM 200 // ponizej tego zaczynaja sie przyciski scrolla
 
 // ---- proste komunikaty na ekranie ----
-void showMessage(const char* line1, const char* line2 = "", uint32_t color = TFT_BLACK) {
-  display.fillScreen(TFT_WHITE);
+void showMessage(const char* line1, const char* line2 = "", uint32_t color = COLOR_TEXT) {
+  display.fillScreen(COLOR_BG);
   display.setTextColor(color);
   display.setTextSize(2);
   display.setCursor(10, 40);
@@ -155,17 +178,20 @@ void showMessage(const char* line1, const char* line2 = "", uint32_t color = TFT
 
 // callback wywoływany, gdy WiFiManager wchodzi w tryb konfiguracji (AP)
 void configModeCallback(WiFiManager* myWiFiManager) {
-  display.fillScreen(TFT_BLACK);
-  display.setTextColor(TFT_WHITE);
+  display.fillScreen(COLOR_BG);
+  display.setTextColor(COLOR_PRIMARY);
   display.setTextSize(2);
   display.setCursor(10, 20);
   display.println("KONFIGURACJA WIFI");
+  display.setTextColor(COLOR_TEXT);
   display.setTextSize(1);
   display.setCursor(10, 60);
   display.println("Polacz sie z siecia:");
+  display.setTextColor(COLOR_ACCENT_MINT);
   display.setTextSize(2);
   display.setCursor(10, 75);
   display.println(myWiFiManager->getConfigPortalSSID());
+  display.setTextColor(COLOR_TEXT);
   display.setTextSize(1);
   display.setCursor(10, 110);
   display.println("Nastepnie otworz w przegladarce:");
@@ -217,7 +243,7 @@ bool claimDevice(const String& code) {
   }
 
   if (status != 200) {
-    showMessage("Blad parowania", response.c_str(), TFT_RED);
+    showMessage("Blad parowania", response.c_str(), COLOR_DANGER);
     Serial.printf("claim status=%d body=%s\n", status, response.c_str());
     delay(3000);
     return false;
@@ -225,7 +251,7 @@ bool claimDevice(const String& code) {
 
   JsonDocument resDoc;
   if (deserializeJson(resDoc, response) != DeserializationError::Ok) {
-    showMessage("Blad parowania", "Nieprawidlowa odpowiedz serwera", TFT_RED);
+    showMessage("Blad parowania", "Nieprawidlowa odpowiedz serwera", COLOR_DANGER);
     delay(3000);
     return false;
   }
@@ -234,14 +260,14 @@ bool claimDevice(const String& code) {
   prefs.putString("apiKey", apiKey);
   prefs.putString("apiHost", apiHost);
 
-  showMessage("Sparowano!", "", TFT_DARKGREEN);
+  showMessage("Sparowano!", "", COLOR_ACCENT_MINT);
   delay(1500);
   return true;
 }
 
 // ---- kasuje WiFi + parowanie i wraca do portalu konfiguracyjnego ----
 void resetWifiAndPairing() {
-  showMessage("Resetowanie...", "Kasuje WiFi i parowanie", TFT_RED);
+  showMessage("Resetowanie...", "Kasuje WiFi i parowanie", COLOR_DANGER);
   delay(1000);
 
   prefs.remove("apiKey");
@@ -253,14 +279,15 @@ void resetWifiAndPairing() {
 }
 
 void drawTopButtons() {
-  display.fillRect(REFRESH_BTN_X, REFRESH_BTN_Y, REFRESH_BTN_W, REFRESH_BTN_H, TFT_DARKGREEN);
-  display.setTextColor(TFT_WHITE);
+  display.fillRoundRect(REFRESH_BTN_X + 4, REFRESH_BTN_Y + 2, REFRESH_BTN_W - 8, REFRESH_BTN_H - 4, 6, COLOR_PRIMARY);
+  display.setTextColor(COLOR_ON_ACCENT);
   display.setTextSize(1);
-  display.setCursor(REFRESH_BTN_X + 6, REFRESH_BTN_Y + 12);
+  display.setCursor(REFRESH_BTN_X + 10, REFRESH_BTN_Y + 12);
   display.print("Odswiez");
 
-  display.fillRect(RESET_BTN_X, RESET_BTN_Y, RESET_BTN_W, RESET_BTN_H, TFT_RED);
-  display.setCursor(RESET_BTN_X + 6, RESET_BTN_Y + 12);
+  display.fillRoundRect(RESET_BTN_X + 4, RESET_BTN_Y + 2, RESET_BTN_W - 8, RESET_BTN_H - 4, 6, COLOR_RESET);
+  display.setTextColor(COLOR_TEXT);
+  display.setCursor(RESET_BTN_X + 10, RESET_BTN_Y + 12);
   display.print("Reset");
 }
 
@@ -270,13 +297,14 @@ bool pointInRect(int32_t x, int32_t y, int rx, int ry, int rw, int rh) {
 
 // przyciski przewijania (dol ekranu) - wspolne dla listy notatek i widoku szczegolow
 void drawScrollButtons(bool canUp, bool canDown) {
-  display.fillRect(SCROLL_UP_BTN_X, SCROLL_BTN_Y, SCROLL_BTN_W, SCROLL_BTN_H, canUp ? TFT_DARKGREEN : TFT_LIGHTGREY);
-  display.setTextColor(TFT_WHITE);
+  display.fillRoundRect(SCROLL_UP_BTN_X, SCROLL_BTN_Y, SCROLL_BTN_W, SCROLL_BTN_H, 6, canUp ? COLOR_PRIMARY : COLOR_BORDER);
+  display.setTextColor(canUp ? COLOR_ON_ACCENT : COLOR_TEXT_MUTED);
   display.setTextSize(1);
   display.setCursor(SCROLL_UP_BTN_X + 14, SCROLL_BTN_Y + 11);
   display.print("Gora");
 
-  display.fillRect(SCROLL_DOWN_BTN_X, SCROLL_BTN_Y, SCROLL_BTN_W, SCROLL_BTN_H, canDown ? TFT_DARKGREEN : TFT_LIGHTGREY);
+  display.fillRoundRect(SCROLL_DOWN_BTN_X, SCROLL_BTN_Y, SCROLL_BTN_W, SCROLL_BTN_H, 6, canDown ? COLOR_PRIMARY : COLOR_BORDER);
+  display.setTextColor(canDown ? COLOR_ON_ACCENT : COLOR_TEXT_MUTED);
   display.setCursor(SCROLL_DOWN_BTN_X + 16, SCROLL_BTN_Y + 11);
   display.print("Dol");
 }
@@ -324,8 +352,8 @@ void scrollList(int deltaRows) {
 // ---- pobiera liste notatek (GET /api/device-notes/lite) i renderuje ekran listy ----
 void renderNotesList() {
   currentScreen = SCREEN_LIST;
-  display.fillScreen(TFT_WHITE);
-  display.setTextColor(TFT_BLACK);
+  display.fillScreen(COLOR_BG);
+  display.setTextColor(COLOR_BRIGHT_TEXT);
   display.setTextSize(2);
   display.setCursor(70, 6);
   display.println("NOTATNIK");
@@ -334,13 +362,14 @@ void renderNotesList() {
   display.setTextSize(1);
 
   if (apiKey.length() == 0) {
+    display.setTextColor(COLOR_TEXT_MUTED);
     display.setCursor(10, 50);
     display.println("Urzadzenie niesparowane.");
     return;
   }
 
   if (notesCount == 0) {
-    display.setTextColor(TFT_BLACK);
+    display.setTextColor(COLOR_TEXT_MUTED);
     display.setCursor(10, 50);
     display.println("Brak notatek.");
     return;
@@ -354,10 +383,16 @@ void renderNotesList() {
     int idx = listScrollRow + i;
     int cardH = LIST_ROW_HEIGHT - 6;
 
-    // ramka wokol notatki, zeby bylo widac gdzie kliknac
-    display.drawRoundRect(6, y, display.width() - 12, cardH, 5, TFT_DARKGREY);
+    // karta notatki - szare tlo, z boku pasek w kolorze wybranym przez uzytkownika
+    // (odpowiednik .note-accent z NoteCard.vue na stronie)
+    display.fillRoundRect(6, y, display.width() - 12, cardH, 6, COLOR_CARD_GREY);
+    if (notesList[idx].color.length() > 0) {
+      uint16_t accent = hexToColor565(notesList[idx].color);
+      display.fillRoundRect(6, y, 8, cardH, 3, accent);
+    }
+    display.drawRoundRect(6, y, display.width() - 12, cardH, 6, COLOR_BORDER);
 
-    display.setTextColor(TFT_BLACK);
+    display.setTextColor(COLOR_BRIGHT_TEXT);
     display.setTextSize(2);
     display.setCursor(16, y + cardH / 2 - 8);
     String shownTitle = notesList[idx].title;
@@ -369,7 +404,7 @@ void renderNotesList() {
     if (notesList[idx].hasAudio) badges += "[A]";
     if (badges.length() > 0) {
       display.setTextSize(1);
-      display.setTextColor(TFT_DARKGREEN);
+      display.setTextColor(COLOR_ACCENT_MINT);
       display.setCursor(display.width() - 16 - badges.length() * 6, y + cardH / 2 - 4);
       display.print(badges);
     }
@@ -401,7 +436,7 @@ void fetchNotesLite() {
   if (status != 200) {
     Serial.printf("device-notes/lite status=%d body=%s\n", status, response.c_str());
     renderNotesList();
-    display.setTextColor(TFT_RED);
+    display.setTextColor(COLOR_DANGER);
     display.setCursor(10, 50);
     display.printf("Blad pobierania (HTTP %d)", status);
     return;
@@ -410,7 +445,7 @@ void fetchNotesLite() {
   JsonDocument doc;
   if (deserializeJson(doc, response) != DeserializationError::Ok) {
     renderNotesList();
-    display.setTextColor(TFT_RED);
+    display.setTextColor(COLOR_DANGER);
     display.setCursor(10, 50);
     display.println("Blad odczytu listy notatek");
     return;
@@ -423,6 +458,7 @@ void fetchNotesLite() {
     notesList[notesCount].title = String((const char*)(note["title"] | "(bez tytulu)"));
     notesList[notesCount].hasDrawing = note["hasDrawing"] | false;
     notesList[notesCount].hasAudio = note["hasAudio"] | false;
+    notesList[notesCount].color = note["color"].isNull() ? "" : String((const char*)note["color"]);
     notesCount++;
   }
 
@@ -478,16 +514,16 @@ int detailMaxScroll() {
 }
 
 void drawDetailChrome() {
-  display.fillScreen(TFT_WHITE);
+  display.fillScreen(COLOR_BG);
 
   // naglowek z przyciskiem powrotu
-  display.fillRect(BACK_BTN_X, BACK_BTN_Y, BACK_BTN_W, BACK_BTN_H, TFT_DARKGREEN);
-  display.setTextColor(TFT_WHITE);
+  display.fillRoundRect(BACK_BTN_X + 4, BACK_BTN_Y + 2, BACK_BTN_W - 8, BACK_BTN_H - 4, 6, COLOR_PRIMARY);
+  display.setTextColor(COLOR_ON_ACCENT);
   display.setTextSize(1);
-  display.setCursor(BACK_BTN_X + 6, BACK_BTN_Y + 12);
+  display.setCursor(BACK_BTN_X + 10, BACK_BTN_Y + 12);
   display.print("< Wstecz");
 
-  display.setTextColor(TFT_BLACK);
+  display.setTextColor(COLOR_BRIGHT_TEXT);
   display.setTextSize(2);
   display.setCursor(BACK_BTN_W + 10, 6);
   String shownTitle = detailTitle;
@@ -495,10 +531,10 @@ void drawDetailChrome() {
   display.println(shownTitle);
 
   if (detailHasDrawing) {
-    display.fillRect(DRAWING_BTN_X, DRAWING_BTN_Y, DRAWING_BTN_W, DRAWING_BTN_H, TFT_DARKGREEN);
-    display.setTextColor(TFT_WHITE);
+    display.fillRoundRect(DRAWING_BTN_X + 4, DRAWING_BTN_Y + 2, DRAWING_BTN_W - 8, DRAWING_BTN_H - 4, 6, COLOR_ACCENT_MINT);
+    display.setTextColor(COLOR_ON_ACCENT);
     display.setTextSize(1);
-    display.setCursor(DRAWING_BTN_X + 3, DRAWING_BTN_Y + 12);
+    display.setCursor(DRAWING_BTN_X + 9, DRAWING_BTN_Y + 12);
     display.print("Rys.");
   }
 
@@ -507,7 +543,7 @@ void drawDetailChrome() {
 
 void drawDetailContent() {
   // czysci tylko obszar tresci, zeby nie przerysowywac naglowka/przyciskow przy scrollu
-  display.fillRect(0, DETAIL_CONTENT_TOP, display.width(), DETAIL_CONTENT_BOTTOM - DETAIL_CONTENT_TOP, TFT_WHITE);
+  display.fillRect(0, DETAIL_CONTENT_TOP, display.width(), DETAIL_CONTENT_BOTTOM - DETAIL_CONTENT_TOP, COLOR_BG);
 
   display.setTextSize(1);
 
@@ -566,7 +602,7 @@ void selectNote(int index) {
 
   if (status != 200) {
     Serial.printf("device-notes/{id} status=%d body=%s\n", status, response.c_str());
-    showMessage("Blad wczytywania", "Sprobuj ponownie", TFT_RED);
+    showMessage("Blad wczytywania", "Sprobuj ponownie", COLOR_DANGER);
     delay(2000);
     renderNotesList();
     return;
@@ -574,7 +610,7 @@ void selectNote(int index) {
 
   detailDoc.clear();
   if (deserializeJson(detailDoc, response) != DeserializationError::Ok) {
-    showMessage("Blad wczytywania", "Nieprawidlowa odpowiedz", TFT_RED);
+    showMessage("Blad wczytywania", "Nieprawidlowa odpowiedz", COLOR_DANGER);
     delay(2000);
     renderNotesList();
     return;
@@ -597,13 +633,17 @@ void selectNote(int index) {
     String type = String((const char*)(block["type"] | "paragraph"));
     bool bold = block["bold"] | false;
 
-    uint16_t color = TFT_BLACK;
+    uint16_t color = COLOR_TEXT;
     if (!block["color"].isNull()) {
-      color = hexToColor565(String((const char*)block["color"]));
+      String hex = String((const char*)block["color"]);
+      // czarny tekst z edytora (domyslny kolor na jasnym tle strony) zamieniamy na
+      // jasny tekst motywu, zeby byl czytelny na ciemnym tle ekranu - inne kolory (akcenty
+      // wybrane recznie przez uzytkownika) zostawiamy bez zmian
+      color = (hex == "#000000") ? COLOR_TEXT : hexToColor565(hex);
     } else if (type == "blockquote") {
-      color = TFT_DARKGREY;
+      color = COLOR_TEXT_MUTED;
     } else if (type == "codeBlock") {
-      color = TFT_NAVY;
+      color = COLOR_ACCENT_MINT;
     }
 
     String prefix = "";
@@ -619,7 +659,7 @@ void selectNote(int index) {
   }
 
   if (detailLines.empty()) {
-    detailLines.push_back({ "(notatka nie zawiera tekstu)", TFT_BLACK, false });
+    detailLines.push_back({ "(notatka nie zawiera tekstu)", COLOR_TEXT_MUTED, false });
   }
   detailScrollLine = 0;
 
@@ -631,12 +671,14 @@ void selectNote(int index) {
 // wiec renderujemy je wprost jako polaczone odcinki przeskalowane pod rozmiar ekranu
 void renderDrawingScreen(int index) {
   currentScreen = SCREEN_DRAWING;
+  // tlo rysunku zostaje jasne - pociagniecia sa zapisane z zalozeniem bialego
+  // canvasu (tak jak w edytorze na stronie), wiec ciemny motyw psulby ich czytelnosc
   display.fillScreen(TFT_WHITE);
 
-  display.fillRect(BACK_BTN_X, BACK_BTN_Y, BACK_BTN_W, BACK_BTN_H, TFT_DARKGREEN);
-  display.setTextColor(TFT_WHITE);
+  display.fillRoundRect(BACK_BTN_X + 4, BACK_BTN_Y + 2, BACK_BTN_W - 8, BACK_BTN_H - 4, 6, COLOR_PRIMARY);
+  display.setTextColor(COLOR_ON_ACCENT);
   display.setTextSize(1);
-  display.setCursor(BACK_BTN_X + 6, BACK_BTN_Y + 12);
+  display.setCursor(BACK_BTN_X + 10, BACK_BTN_Y + 12);
   display.print("< Wstecz");
 
   JsonArray drawings = detailDoc["drawings"].as<JsonArray>();
@@ -705,7 +747,7 @@ void setup() {
 
   display.init();
   display.setRotation(1);
-  display.fillScreen(TFT_BLACK);
+  display.fillScreen(COLOR_BG);
 
   // kalibracja dotyku (jak w oryginalnym szkicu)
   uint16_t calData[8] = {3826, 308, 3886, 3793, 361, 252, 359, 3741};
@@ -731,7 +773,7 @@ void setup() {
   bool connected = wm.autoConnect("Notatnik-ESP32");
 
   if (!connected) {
-    showMessage("Brak polaczenia", "Restart za 3s...", TFT_RED);
+    showMessage("Brak polaczenia", "Restart za 3s...", COLOR_DANGER);
     delay(3000);
     ESP.restart();
   }
@@ -749,7 +791,7 @@ void setup() {
   }
   Serial.println("apiHost: " + apiHost);
 
-  showMessage("Polaczono!", WiFi.localIP().toString().c_str(), TFT_DARKGREEN);
+  showMessage("Polaczono!", WiFi.localIP().toString().c_str(), COLOR_ACCENT_MINT);
   delay(1000);
 
   // jesli w portalu wpisano kod parowania - sparuj urzadzenie zanim wejdziemy do glownego ekranu
@@ -757,7 +799,7 @@ void setup() {
   if (enteredCode.length() > 0) {
     claimDevice(enteredCode);
   } else if (apiKey.length() == 0) {
-    showMessage("Brak parowania", "Uzyj portalu WiFi, by wpisac kod", TFT_RED);
+    showMessage("Brak parowania", "Uzyj portalu WiFi, by wpisac kod", COLOR_DANGER);
     delay(3000);
   }
 

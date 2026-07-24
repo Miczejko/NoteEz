@@ -45,6 +45,7 @@ async function handleSubmit() {
               type="text"
               class="input-field"
               autocomplete="username"
+              maxlength="32"
               required
             />
           </div>
@@ -56,6 +57,7 @@ async function handleSubmit() {
               type="password"
               class="input-field"
               autocomplete="current-password"
+              maxlength="100"
               required
             />
           </div>

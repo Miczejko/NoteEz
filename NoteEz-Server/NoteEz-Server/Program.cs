@@ -7,7 +7,9 @@ using Microsoft.IdentityModel.Tokens;
 using NoteEz_Server.Data;
 using NoteEz_Server.Services;
 using System.Text;
+using System.Threading.RateLimiting;
 using NoteEz_Server.Authentication;
+using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,8 +36,6 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    Console.WriteLine($"Jwt:Key = '{builder.Configuration["Jwt:Key"]}'");
-
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
@@ -83,6 +83,36 @@ builder.Services.AddSingleton(sp =>
     return containerClient;
 });
 
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    {
+        var partitionKey = httpContext.User.Identity?.IsAuthenticated == true
+            ? httpContext.User.Identity.Name ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous"
+            : httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
+
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 100,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        });
+    });
+
+    options.AddPolicy("auth", httpContext =>
+    {
+        var partitionKey = httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        });
+    });
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -91,19 +121,32 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+else
+{
+    app.UseHsts();
+}
 
 app.UseHttpsRedirection();
 
+// naglowki ograniczajace typowe ataki po stronie przegladarki (clickjacking, MIME sniffing, wyciek referrera)
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["Referrer-Policy"] = "no-referrer";
+    await next();
+});
+
 app.UseCors("Frontend");
+
+app.UseRateLimiter();
 
 app.UseAuthorization();
 
 app.MapControllers();
 
-app.MapGet("/api/diagnostics/blob-test", async (BlobContainerClient container) =>
-{
-    var exists = await container.ExistsAsync();
-    return Results.Ok(new { containerExists = exists.Value });
-});
-
 app.Run();
+
+// Umozliwia WebApplicationFactory<Program> w projekcie testowym (NoteEz-Server.Tests)
+// dostep do tej klasy Program wygenerowanej z top-level statements.
+public partial class Program { }

@@ -49,6 +49,7 @@ async function handleCreate() {
           type="text"
           class="input-field"
           placeholder="Tytuł notatki…"
+          maxlength="200"
           @keyup.enter="handleCreate"
         />
         <button class="btn btn-accent" :disabled="creating || !newTitle.trim()" @click="handleCreate">
