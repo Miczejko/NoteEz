@@ -70,7 +70,7 @@ async function handleRevoke(deviceId) {
     <div class="devices-page">
       <div class="page-header">
         <div class="page-header-title">
-          <router-link to="/" class="btn btn-ghost btn-sm back-btn">← Powrót</router-link>
+          <router-link :to="{ name: 'notes' }" class="btn btn-ghost btn-sm back-btn">← Powrót</router-link>
           <h1>Urządzenia</h1>
         </div>
         <button class="btn btn-primary" :disabled="pairingLoading" @click="handlePairing">
@@ -255,12 +255,12 @@ async function handleRevoke(deviceId) {
 }
 
 .badge-active {
-  background: rgba(175, 227, 192, 0.5);
-  color: #3a7a5a;
+  background: rgba(153, 209, 156, 0.2);
+  color: var(--celadon);
 }
 
 .badge-revoked {
-  background: rgba(196, 92, 92, 0.15);
+  background: rgba(224, 118, 110, 0.15);
   color: var(--color-danger);
 }
 

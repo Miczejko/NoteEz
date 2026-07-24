@@ -18,9 +18,8 @@ async function handleLogout() {
 <template>
   <div class="layout">
     <header v-if="showNav" class="header">
-      <router-link to="/" class="logo">
-        <span class="logo-icon">📝</span>
-        <span class="logo-text">NoteEz</span>
+      <router-link :to="auth.isAuthenticated ? { name: 'notes' } : { name: 'home' }" class="logo">
+        <img src="/noteez-logo.png" alt="NoteEz" class="logo-icon" />
       </router-link>
       <div class="header-actions">
         <span v-if="auth.username" class="username">{{ auth.username }}</span>
@@ -46,7 +45,7 @@ async function handleLogout() {
   justify-content: space-between;
   padding: 0.875rem 1.25rem;
   background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
-  color: white;
+  color: var(--color-on-accent);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -57,7 +56,7 @@ async function handleLogout() {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: white;
+  color: var(--color-on-accent);
   text-decoration: none;
   font-weight: 700;
   font-size: 1.25rem;
@@ -69,7 +68,9 @@ async function handleLogout() {
 }
 
 .logo-icon {
-  font-size: 1.5rem;
+  height: 2.25rem;
+  width: auto;
+  object-fit: contain;
 }
 
 .header-actions {
@@ -84,12 +85,12 @@ async function handleLogout() {
 }
 
 .header-actions .btn-ghost {
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(0, 5, 1, 0.75);
 }
 
 .header-actions .btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
+  background: rgba(0, 5, 1, 0.1);
+  color: var(--color-on-accent);
 }
 
 .main {

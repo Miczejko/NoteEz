@@ -9,7 +9,8 @@ namespace NoteEz_Server.Models
         public Guid Id { get; set; }
         public Guid UserId { get; set; }
         public string Title { get; set; }
-        public string? TextContent { get; set; }  
+        public string? TextContent { get; set; }
+        public string? Color { get; set; } // akcent kafelka na liscie notatek, np. "#8963ba"
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
 
@@ -22,6 +23,7 @@ namespace NoteEz_Server.Models
         Guid Id,
         string Title,
         string? TextContent,
+        string? Color,
         DateTime UpdatedAt,
         IReadOnlyList<NoteDrawingDto> Drawings,
         IReadOnlyList<NoteAudioDto> AudioClips
@@ -29,8 +31,8 @@ namespace NoteEz_Server.Models
 
     public record NoteLiteDto(Guid Id, string Title, bool HasDrawing, bool HasAudio);
 
-    public record CreateNoteRequest(string Title, string? TextContent);
-    public record UpdateNoteRequest(string? Title, string? TextContent);
+    public record CreateNoteRequest(string Title, string? TextContent, string? Color);
+    public record UpdateNoteRequest(string? Title, string? TextContent, string? Color);
     public record AddDrawingRequest(string StrokesJson);
     public record ReorderRequest(List<Guid> OrderedIds);
 }

@@ -26,6 +26,7 @@ namespace NoteEz_Server.Services
                 UserId = userId,
                 Title = req.Title,
                 TextContent = req.TextContent,
+                Color = req.Color,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -77,6 +78,7 @@ namespace NoteEz_Server.Services
 
             if (req.Title is not null) note.Title = req.Title;
             if (req.TextContent is not null) note.TextContent = req.TextContent;
+            if (req.Color is not null) note.Color = req.Color.Length == 0 ? null : req.Color;
             note.UpdatedAt = DateTime.UtcNow;
 
             await _db.SaveChangesAsync();
@@ -152,6 +154,7 @@ namespace NoteEz_Server.Services
             n.Id,
             n.Title,
             n.TextContent,
+            n.Color,
             n.UpdatedAt,
             n.Drawings.OrderBy(d => d.SortOrder).Select(d => new NoteDrawingDto(d.Id, d.StrokesJson, d.SortOrder)).ToList(),
             n.AudioClips.OrderBy(a => a.SortOrder).Select(a => new NoteAudioDto(a.Id, a.BlobUrl, a.DurationSeconds, a.SortOrder)).ToList()

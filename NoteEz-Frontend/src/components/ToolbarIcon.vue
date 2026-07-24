@@ -1,0 +1,52 @@
+<script setup>
+defineProps({
+  name: { type: String, required: true },
+})
+</script>
+
+<template>
+  <svg class="toolbar-icon" viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <template v-if="name === 'bold'">
+      <path d="M6 4h5a3 3 0 0 1 0 6H6zM6 10h5.5a3 3 0 0 1 0 6H6z" />
+    </template>
+    <template v-else-if="name === 'italic'">
+      <path d="M9 4h6M5 16h6M12 4 8 16" />
+    </template>
+    <template v-else-if="name === 'strike'">
+      <path d="M4 10h12M7 6c0-1 1.2-2 3-2s3.2 1 3 2.2M7 14c0 1 1.2 2 3 2s3.2-1 3-2.5" />
+    </template>
+    <template v-else-if="name === 'heading'">
+      <path d="M5 4v12M13 4v12M5 10h8" />
+    </template>
+    <template v-else-if="name === 'bulletList'">
+      <circle cx="4.5" cy="5" r="1" fill="currentColor" stroke="none" />
+      <circle cx="4.5" cy="10" r="1" fill="currentColor" stroke="none" />
+      <circle cx="4.5" cy="15" r="1" fill="currentColor" stroke="none" />
+      <path d="M8 5h8M8 10h8M8 15h8" />
+    </template>
+    <template v-else-if="name === 'orderedList'">
+      <path d="M8 5h8M8 10h8M8 15h8" />
+      <path d="M4 4.5v3M3.3 4.5h1.4M3.3 7.5h1.4M4 10.2c1 0 1.5.4 1.5 1s-.5.8-1 .9c.6.1 1.1.4 1.1 1s-.6 1-1.5 1c-.5 0-.9-.1-1.2-.3" stroke-width="1.1" />
+    </template>
+    <template v-else-if="name === 'checkbox'">
+      <rect x="4" y="4" width="12" height="12" rx="2.5" />
+      <path d="M6.5 10.2 9 12.5l4.5-5.2" />
+    </template>
+    <template v-else-if="name === 'quote'">
+      <path d="M5.5 6.5c-1.4 0-2.5 1.1-2.5 2.5S4.1 11.5 5.5 11.5c.2 1.6-.7 2.9-2 3.5M12.5 6.5c-1.4 0-2.5 1.1-2.5 2.5s1.1 2.5 2.5 2.5c.2 1.6-.7 2.9-2 3.5" />
+    </template>
+    <template v-else-if="name === 'code'">
+      <path d="M7 5 3 10l4 5M13 5l4 5-4 5M11 4 9 16" />
+    </template>
+    <template v-else-if="name === 'drawing'">
+      <path d="M4 16 4.7 13 13 4.7a1.5 1.5 0 0 1 2.1 2.1L7 15z" />
+      <path d="M11.2 6.5 13.5 8.8" />
+    </template>
+  </svg>
+</template>
+
+<style scoped>
+.toolbar-icon {
+  display: block;
+}
+</style>

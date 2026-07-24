@@ -3,6 +3,11 @@ import { useAuthStore } from '../stores/auth'
 
 const routes = [
   {
+    path: '/',
+    name: 'home',
+    component: () => import('../views/HomeView.vue'),
+  },
+  {
     path: '/login',
     name: 'login',
     component: () => import('../views/LoginView.vue'),
@@ -15,7 +20,7 @@ const routes = [
     meta: { guest: true },
   },
   {
-    path: '/',
+    path: '/notes',
     name: 'notes',
     component: () => import('../views/NotesView.vue'),
     meta: { requiresAuth: true },

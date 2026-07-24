@@ -14,7 +14,10 @@ const isDrawing = ref(false)
 const currentStroke = ref(null)
 const isCanvasReady = ref(false)
 
-const colors = ['#54428e', '#8963ba', '#afe3c0', '#90c290', '#2d2640']
+const colors = [
+  '#2d2640', '#54428e', '#8963ba', '#afe3c0', '#90c290',
+  '#d64545', '#e08a2c', '#e0c93c', '#3468c0', '#3aa0a0',
+]
 const selectedColor = ref(colors[0])
 const strokeWidth = ref(3)
 
@@ -232,6 +235,14 @@ onUnmounted(() => {
           :title="color"
           @click="selectedColor = color"
         />
+        <label
+          class="color-btn custom-color-btn"
+          :class="{ active: !colors.includes(selectedColor) }"
+          :style="{ background: !colors.includes(selectedColor) ? selectedColor : undefined }"
+          title="Własny kolor"
+        >
+          <input type="color" :value="selectedColor" @input="selectedColor = $event.target.value" />
+        </label>
       </div>
       <div class="width-picker">
         <label>Szerokość:</label>
@@ -274,12 +285,13 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem;
-  background: rgba(175, 227, 192, 0.15);
+  background: rgba(153, 209, 156, 0.1);
   border-radius: var(--radius-sm);
 }
 
 .color-picker {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.375rem;
 }
 
@@ -295,6 +307,37 @@ onUnmounted(() => {
 .color-btn.active {
   border-color: var(--color-text);
   transform: scale(1.15);
+}
+
+.custom-color-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red);
+  font-size: 0.9375rem;
+  line-height: 1;
+  overflow: hidden;
+}
+
+.custom-color-btn::after {
+  content: '+';
+  color: #fff;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+.custom-color-btn.active::after {
+  content: '';
+}
+
+.custom-color-btn input[type='color'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .width-picker {

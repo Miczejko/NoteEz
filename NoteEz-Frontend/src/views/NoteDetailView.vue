@@ -13,8 +13,11 @@ const notesStore = useNotesStore()
 
 const title = ref('')
 const textContent = ref('')
+const color = ref(null)
 const saving = ref(false)
 const activeTab = ref('text')
+
+const noteColors = ['#8963ba', '#d64545', '#e08a2c', '#e0c93c', '#3aa0a0', '#3468c0', '#90c290']
 
 const note = computed(() => notesStore.currentNote)
 
@@ -23,6 +26,7 @@ onMounted(async () => {
   if (note.value) {
     title.value = note.value.title || ''
     textContent.value = note.value.textContent || ''
+    color.value = note.value.color || null
   }
 })
 
@@ -33,9 +37,15 @@ watch(
     if (note.value) {
       title.value = note.value.title || ''
       textContent.value = note.value.textContent || ''
+      color.value = note.value.color || null
     }
   }
 )
+
+function pickColor(c) {
+  color.value = color.value === c ? null : c
+  saveNote()
+}
 
 let saveTimeout = null
 function scheduleSave() {
@@ -55,6 +65,7 @@ async function saveNote() {
     await notesStore.update(note.value.id, {
       title: title.value,
       textContent: textContent.value,
+      color: color.value || '',
     })
   } finally {
     saving.value = false
@@ -84,7 +95,7 @@ async function handleDeleteAudio(audioId) {
     <div v-else-if="!note" class="state-msg error-msg">Notatka nie znaleziona</div>
     <div v-else class="note-detail">
       <div class="detail-header">
-        <router-link to="/" class="back-link">← Wróć</router-link>
+        <router-link :to="{ name: 'notes' }" class="back-link">← Wróć</router-link>
         <div class="header-actions">
           <span v-if="saving" class="save-indicator">Zapisywanie…</span>
           <button class="btn btn-danger btn-sm" @click="handleDelete">Usuń</button>
@@ -98,6 +109,29 @@ async function handleDeleteAudio(audioId) {
         placeholder="Tytuł notatki"
         @input="scheduleSave"
       />
+
+      <div class="color-row">
+        <span class="color-row-label">Kolor kafelka:</span>
+        <button
+          v-for="c in noteColors"
+          :key="c"
+          type="button"
+          class="color-swatch"
+          :class="{ active: color === c }"
+          :style="{ background: c }"
+          :title="c"
+          @click="pickColor(c)"
+        />
+        <button
+          v-if="color"
+          type="button"
+          class="color-swatch color-swatch-none"
+          title="Usuń kolor"
+          @click="pickColor(null)"
+        >
+          ×
+        </button>
+      </div>
 
       <div class="tabs">
         <button
@@ -190,6 +224,45 @@ async function handleDeleteAudio(audioId) {
 .title-input:focus {
   outline: none;
   border-bottom-color: var(--color-secondary);
+}
+
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.color-row-label {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin-right: 0.25rem;
+}
+
+.color-swatch {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.1s;
+}
+
+.color-swatch.active {
+  border-color: var(--color-text);
+  transform: scale(1.15);
+}
+
+.color-swatch-none {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.9375rem;
+  line-height: 1;
 }
 
 .tabs {

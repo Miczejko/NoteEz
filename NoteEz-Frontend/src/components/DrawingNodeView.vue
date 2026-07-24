@@ -92,7 +92,7 @@ function handleEdit() {
   padding: 0.75rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  background: rgba(175, 227, 192, 0.08);
+  background: rgba(153, 209, 156, 0.06);
 }
 
 .drawing-node-inner.saving {

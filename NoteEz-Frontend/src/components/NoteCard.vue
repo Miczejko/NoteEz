@@ -21,6 +21,11 @@ function formatDate(dateStr) {
 
 <template>
   <router-link :to="`/notes/${note.id}`" class="note-card card">
+    <div
+      v-if="note.color"
+      class="note-accent"
+      :style="{ background: `linear-gradient(135deg, ${note.color}, transparent)` }"
+    />
     <div class="note-card-header">
       <h3 class="note-title">{{ note.title || 'Bez tytułu' }}</h3>
       <time class="note-date">{{ formatDate(note.updatedAt) }}</time>
@@ -35,11 +40,23 @@ function formatDate(dateStr) {
 
 <style scoped>
 .note-card {
+  position: relative;
   display: block;
   padding: 1.125rem 1.25rem;
   text-decoration: none;
   color: inherit;
+  overflow: hidden;
   transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.note-accent {
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  height: 100%;
+  clip-path: polygon(0 0, 100% 0, 40% 100%, 0 100%);
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 .note-card:hover {
@@ -98,12 +115,12 @@ function formatDate(dateStr) {
 }
 
 .badge-drawing {
-  background: rgba(175, 227, 192, 0.5);
-  color: #3a7a5a;
+  background: rgba(153, 209, 156, 0.2);
+  color: var(--celadon);
 }
 
 .badge-audio {
-  background: rgba(144, 194, 144, 0.4);
-  color: #3a6a3a;
+  background: rgba(115, 171, 132, 0.2);
+  color: var(--muted-teal);
 }
 </style>

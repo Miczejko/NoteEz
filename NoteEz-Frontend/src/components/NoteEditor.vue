@@ -6,6 +6,7 @@ import { TextStyle, Color } from '@tiptap/extension-text-style'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { DrawingBlock } from '../tiptap/drawingBlock'
+import ToolbarIcon from './ToolbarIcon.vue'
 
 const props = defineProps({
   modelValue: { type: [String, Object], default: null },
@@ -64,18 +65,18 @@ onBeforeUnmount(() => {
 <template>
   <div class="note-editor">
     <div v-if="editor" class="toolbar">
-      <button type="button" :class="{ active: editor.isActive('bold') }" @click="editor.chain().focus().toggleBold().run()">B</button>
-      <button type="button" :class="{ active: editor.isActive('italic') }" @click="editor.chain().focus().toggleItalic().run()"><i>I</i></button>
-      <button type="button" :class="{ active: editor.isActive('strike') }" @click="editor.chain().focus().toggleStrike().run()"><s>S</s></button>
+      <button type="button" title="Pogrubienie" :class="{ active: editor.isActive('bold') }" @click="editor.chain().focus().toggleBold().run()"><ToolbarIcon name="bold" /></button>
+      <button type="button" title="Kursywa" :class="{ active: editor.isActive('italic') }" @click="editor.chain().focus().toggleItalic().run()"><ToolbarIcon name="italic" /></button>
+      <button type="button" title="Przekreślenie" :class="{ active: editor.isActive('strike') }" @click="editor.chain().focus().toggleStrike().run()"><ToolbarIcon name="strike" /></button>
       <span class="divider" />
-      <button type="button" :class="{ active: editor.isActive('heading', { level: 2 }) }" @click="editor.chain().focus().toggleHeading({ level: 2 }).run()">H2</button>
-      <button type="button" :class="{ active: editor.isActive('bulletList') }" @click="editor.chain().focus().toggleBulletList().run()">• Lista</button>
-      <button type="button" :class="{ active: editor.isActive('orderedList') }" @click="editor.chain().focus().toggleOrderedList().run()">1. Lista</button>
-      <button type="button" :class="{ active: editor.isActive('taskList') }" @click="editor.chain().focus().toggleTaskList().run()">☑ Checkbox</button>
+      <button type="button" title="Nagłówek" :class="{ active: editor.isActive('heading', { level: 2 }) }" @click="editor.chain().focus().toggleHeading({ level: 2 }).run()"><ToolbarIcon name="heading" /></button>
+      <button type="button" title="Lista punktowana" :class="{ active: editor.isActive('bulletList') }" @click="editor.chain().focus().toggleBulletList().run()"><ToolbarIcon name="bulletList" /></button>
+      <button type="button" title="Lista numerowana" :class="{ active: editor.isActive('orderedList') }" @click="editor.chain().focus().toggleOrderedList().run()"><ToolbarIcon name="orderedList" /></button>
+      <button type="button" title="Checkbox" :class="{ active: editor.isActive('taskList') }" @click="editor.chain().focus().toggleTaskList().run()"><ToolbarIcon name="checkbox" /></button>
       <span class="divider" />
-      <button type="button" :class="{ active: editor.isActive('blockquote') }" @click="editor.chain().focus().toggleBlockquote().run()">" "</button>
-      <button type="button" :class="{ active: editor.isActive('codeBlock') }" @click="editor.chain().focus().toggleCodeBlock().run()">{ }</button>
-      <button type="button" @click="insertDrawing">🖊 Rysunek</button>
+      <button type="button" title="Cytat" :class="{ active: editor.isActive('blockquote') }" @click="editor.chain().focus().toggleBlockquote().run()"><ToolbarIcon name="quote" /></button>
+      <button type="button" title="Blok kodu" :class="{ active: editor.isActive('codeBlock') }" @click="editor.chain().focus().toggleCodeBlock().run()"><ToolbarIcon name="code" /></button>
+      <button type="button" title="Wstaw rysunek" @click="insertDrawing"><ToolbarIcon name="drawing" /></button>
       <span class="divider" />
       <label class="color-picker" :style="{ '--swatch': editor.getAttributes('textStyle').color || 'transparent' }">
         A
@@ -114,10 +115,12 @@ onBeforeUnmount(() => {
 }
 
 .toolbar button {
-  min-width: 2rem;
-  padding: 0.3rem 0.5rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  padding: 0;
   border: 1px solid var(--color-border);
   border-radius: 6px;
   background: transparent;
@@ -187,6 +190,8 @@ onBeforeUnmount(() => {
   outline: none;
   line-height: 1.6;
   padding: 0.75rem 0.875rem;
+  /* min 16px, inaczej iOS Safari samoczynnie przybliza strone przy focusie */
+  font-size: max(1rem, 16px);
 }
 
 .editor-content :deep(.ProseMirror p) {

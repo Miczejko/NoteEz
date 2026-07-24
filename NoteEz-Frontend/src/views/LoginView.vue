@@ -29,10 +29,10 @@ async function handleSubmit() {
 <template>
   <AppLayout :show-nav="false">
     <div class="auth-page">
+      <router-link :to="{ name: 'home' }" class="back-link">← Wróć</router-link>
       <div class="auth-card card">
         <div class="auth-header">
-          <span class="auth-icon">📝</span>
-          <h1>NoteEz</h1>
+          <img src="/noteez-logo-tealtext.png" alt="NoteEz" class="auth-icon" />
           <p>Zaloguj się do swoich notatek</p>
         </div>
 
@@ -76,11 +76,21 @@ async function handleSubmit() {
 
 <style scoped>
 .auth-page {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: calc(100dvh - 2.5rem);
   padding: 1rem 0;
+}
+
+.back-link {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-secondary);
 }
 
 .auth-card {
@@ -95,9 +105,12 @@ async function handleSubmit() {
 }
 
 .auth-icon {
-  font-size: 3rem;
+  height: 5.5rem;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
   display: block;
-  margin-bottom: 0.5rem;
+  margin: 0 auto 0.75rem;
 }
 
 .auth-header h1 {
