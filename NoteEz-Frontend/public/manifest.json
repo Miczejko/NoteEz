@@ -1,0 +1,23 @@
+{
+  "name": "NoteEz",
+  "short_name": "NoteEz",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "any",
+  "background_color": "#000501",
+  "theme_color": "#000501",
+  "icons": [
+    {
+      "src": "/noteez-logo-square-tealbg.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/noteez-logo-square-tealbg.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

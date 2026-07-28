@@ -14,6 +14,12 @@ namespace NoteEz_Server.Models
     }
 
     public record PairInitResponse(string Code, DateTime ExpiresAt);
-    public record ClaimDeviceRequest(string Code, string DeviceName);
+
+    public record ClaimDeviceRequest(
+        [Required, StringLength(16, MinimumLength = 4)]
+        string Code,
+        [Required, StringLength(64, MinimumLength = 1)]
+        string DeviceName);
+
     public record ClaimDeviceResponse(string ApiKey);
 }

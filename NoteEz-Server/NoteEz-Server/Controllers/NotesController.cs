@@ -10,7 +10,7 @@ namespace NoteEz_Server.Controllers
 
     [ApiController]
     [Route("api/notes")]
-    //[Authorize] // JWT
+    [Authorize] // JWT
     public class NotesController : ControllerBase
     {
         private readonly NoteService _notes;
@@ -22,8 +22,7 @@ namespace NoteEz_Server.Controllers
             _audio = audio;
         }
 
-        //private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        private Guid UserId => Guid.Parse("179EF867-8249-4556-9744-08DEDB4D8D36");
+        private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         // --- Notatka: tekst/tytuł ---
 
@@ -66,6 +65,20 @@ namespace NoteEz_Server.Controllers
                 return NotFound();
             }
         }
+        [HttpPut("{noteId:guid}/drawings/{drawingId:guid}")]
+        public async Task<ActionResult<NoteDrawingDto>> UpdateDrawing(
+            Guid noteId, Guid drawingId, [FromBody] AddDrawingRequest req)
+        {
+            try
+            {
+                var result = await _notes.UpdateDrawingAsync(UserId, noteId, drawingId, req.StrokesJson);
+                return Ok(result);
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound();
+            }
+        }
 
         [HttpDelete("{id}/drawings/{drawingId}")]
         public async Task<IActionResult> DeleteDrawing(Guid id, Guid drawingId)
@@ -74,13 +87,43 @@ namespace NoteEz_Server.Controllers
 
         // --- Audio ---
 
+        private static readonly HashSet<string> AllowedAudioContentTypes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "audio/webm", "audio/ogg", "audio/opus", "audio/mpeg", "audio/mp4", "audio/wav", "audio/x-wav"
+        };
+        private const long MaxAudioFileSizeBytes = 20_000_000; // ~20MB, dopasuj do realnych rozmiarów głosówek
+
         [HttpPost("{id}/audio")]
-        [RequestSizeLimit(20_000_000)] // ~20MB, dopasuj do realnych rozmiarów głosówek
+        [RequestSizeLimit(MaxAudioFileSizeBytes)]
         public async Task<IActionResult> AddAudio(Guid id, IFormFile file, [FromForm] int durationSeconds)
         {
+            if (file is null || file.Length == 0)
+                return BadRequest(new { error = "Brak pliku audio." });
+
+            if (file.Length > MaxAudioFileSizeBytes)
+                return BadRequest(new { error = "Plik audio jest za duży." });
+
+            var mimeType = file.ContentType?.Split(';')[0].Trim();
+            if (string.IsNullOrWhiteSpace(mimeType) || !AllowedAudioContentTypes.Contains(mimeType))
+                return BadRequest(new { error = $"Nieobsługiwany typ pliku: {file.ContentType}" });
+
+            if (durationSeconds <= 0)
+                return BadRequest(new { error = "Nieprawidłowy czas trwania nagrania." });
+
             try
             {
                 await using var stream = file.OpenReadStream();
+
+                // Content-Type z formularza to tylko deklaracja klienta - sprawdzamy tez
+                // rzeczywisty naglowek pliku, zeby nie przyjac np. .html/.exe podszywajacego
+                // sie pod audio/webm.
+                var header = new byte[AudioSignatureValidator.RequiredHeaderBytes];
+                var read = await stream.ReadAsync(header.AsMemory(0, header.Length));
+                stream.Position = 0;
+
+                if (read < 4 || !AudioSignatureValidator.IsRecognizedAudioContainer(header.AsSpan(0, read)))
+                    return BadRequest(new { error = "Zawartość pliku nie wygląda na obsługiwane audio." });
+
                 var dto = await _audio.AddAsync(UserId, id, stream, file.ContentType, file.Length, durationSeconds);
                 return Ok(dto);
             }

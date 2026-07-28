@@ -7,13 +7,21 @@ using Microsoft.IdentityModel.Tokens;
 using NoteEz_Server.Data;
 using NoteEz_Server.Services;
 using System.Text;
+using System.Threading.RateLimiting;
 using NoteEz_Server.Authentication;
+using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Ensure proper JSON serialization with camelCase naming
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.WriteIndented = false;
+    });
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -28,8 +36,6 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    Console.WriteLine($"Jwt:Key = '{builder.Configuration["Jwt:Key"]}'");
-
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
@@ -47,8 +53,24 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Frontend", policy =>
+    {
+        policy.WithOrigins(allowedOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials(); // wymagane, bo frontend wo≈Ça z withCredentials: true (refresh token cookie)
+    });
+});
+
 builder.Services.AddScoped<NoteService>();
 builder.Services.AddScoped<NoteAudioService>();
+builder.Services.AddScoped<DevicePairingService>();
+builder.Services.AddScoped<EmailService>();
+builder.Services.AddHttpClient<TurnstileService>();
 builder.Services.AddSingleton(sp =>
 {
     var connectionString = builder.Configuration["AzureBlobStorage:ConnectionString"];
@@ -57,10 +79,40 @@ builder.Services.AddSingleton(sp =>
     var blobServiceClient = new BlobServiceClient(connectionString);
     var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
 
-    // upewnij siÍ, øe kontener istnieje (przydatne przy pierwszym uruchomieniu / na nowym úrodowisku)
+    // upewnij siÔøΩ, ÔøΩe kontener istnieje (przydatne przy pierwszym uruchomieniu / na nowym ÔøΩrodowisku)
     containerClient.CreateIfNotExists(PublicAccessType.None);
 
     return containerClient;
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    {
+        var partitionKey = httpContext.User.Identity?.IsAuthenticated == true
+            ? httpContext.User.Identity.Name ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous"
+            : httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
+
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 100,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        });
+    });
+
+    options.AddPolicy("auth", httpContext =>
+    {
+        var partitionKey = httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        });
+    });
 });
 
 var app = builder.Build();
@@ -71,17 +123,32 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+else
+{
+    app.UseHsts();
+}
 
 app.UseHttpsRedirection();
+
+// naglowki ograniczajace typowe ataki po stronie przegladarki (clickjacking, MIME sniffing, wyciek referrera)
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["Referrer-Policy"] = "no-referrer";
+    await next();
+});
+
+app.UseCors("Frontend");
+
+app.UseRateLimiter();
 
 app.UseAuthorization();
 
 app.MapControllers();
 
-app.MapGet("/api/diagnostics/blob-test", async (BlobContainerClient container) =>
-{
-    var exists = await container.ExistsAsync();
-    return Results.Ok(new { containerExists = exists.Value });
-});
-
 app.Run();
+
+// Umozliwia WebApplicationFactory<Program> w projekcie testowym (NoteEz-Server.Tests)
+// dostep do tej klasy Program wygenerowanej z top-level statements.
+public partial class Program { }

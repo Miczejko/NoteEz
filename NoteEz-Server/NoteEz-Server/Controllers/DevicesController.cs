@@ -9,7 +9,7 @@ namespace NoteEz_Server.Controllers
     // Api/Controllers/DevicesController.cs — zarządzanie z poziomu Vue (JWT)
     [ApiController]
     [Route("api/devices")]
-    //[Authorize] // JWT
+    [Authorize] // JWT
     public class DevicesController : ControllerBase
     {
         private readonly DevicePairingService _pairing;

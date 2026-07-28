@@ -1,0 +1,230 @@
+:root {
+  --black: #000501;
+  --muted-teal: #73ab84;
+  --celadon: #99d19c;
+  --pearl-aqua: #79c7c5;
+
+  --color-primary: var(--pearl-aqua);
+  --color-secondary: var(--muted-teal);
+  --color-accent-mint: var(--celadon);
+  --color-accent-sage: var(--muted-teal);
+  --color-bg: var(--black);
+  --color-surface: #0c1512;
+  --color-surface-alt: #121e19;
+  --color-text: #eaf5f0;
+  --color-text-muted: #93aca2;
+  --color-border: #1e2f28;
+  --color-danger: #e0766e;
+  /* przyciski/naglowek na jasnym akcencie potrzebuja ciemnego tekstu, nie bialego */
+  --color-on-accent: var(--black);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+  --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  /* "clip" (not "hidden") - "hidden" makes html/body scroll containers,
+     which silently breaks position:sticky on every descendant. */
+  overflow-x: clip;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.5;
+  min-height: 100dvh;
+  /* "clip" (not "hidden") - "hidden" makes html/body scroll containers,
+     which silently breaks position:sticky on every descendant. */
+  overflow-x: clip;
+}
+
+/* While actively touch-dragging on a drawing canvas: freeze the page at its
+   current scroll position. Some browsers (e.g. Samsung Family Hub's) reveal
+   their own UI chrome on any scroll delta - this removes that delta entirely
+   instead of relying on preventDefault()/touch-action, which they may not
+   fully honor for edge-swipe gestures. */
+body.drawing-scroll-lock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  overflow: hidden;
+}
+
+#app {
+  min-height: 100dvh;
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+input,
+textarea {
+  font-family: inherit;
+  /* min 16px, inaczej iOS Safari samoczynnie przybliza strone przy focusie na polu */
+  font-size: max(1rem, 16px);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+  white-space: nowrap;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: var(--color-on-accent);
+}
+
+.btn-primary:hover {
+  background: color-mix(in srgb, var(--color-primary) 85%, white);
+}
+
+.btn-secondary {
+  background: var(--color-secondary);
+  color: var(--color-on-accent);
+}
+
+.btn-secondary:hover {
+  background: color-mix(in srgb, var(--color-secondary) 85%, white);
+}
+
+.btn-accent {
+  background: var(--color-accent-sage);
+  color: var(--color-on-accent);
+}
+
+.btn-accent:hover {
+  background: color-mix(in srgb, var(--color-accent-sage) 85%, white);
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary);
+}
+
+.btn-outline:hover {
+  background: rgba(121, 199, 197, 0.1);
+}
+
+.btn-danger {
+  background: var(--color-danger);
+  color: var(--color-text);
+}
+
+.btn-danger:hover {
+  background: color-mix(in srgb, var(--color-danger) 85%, black);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.btn-ghost:hover {
+  background: rgba(121, 199, 197, 0.1);
+  color: var(--color-text);
+}
+
+.btn-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.btn-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.input-field {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--color-secondary);
+  box-shadow: 0 0 0 3px rgba(115, 171, 132, 0.25);
+}
+
+.input-field::placeholder {
+  color: var(--color-text-muted);
+}
+
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--color-border);
+}
+
+.error-msg {
+  color: var(--color-danger);
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+}
+
+.info-msg {
+  color: var(--color-secondary);
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+.section-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  margin-bottom: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 15px;
+  }
+}

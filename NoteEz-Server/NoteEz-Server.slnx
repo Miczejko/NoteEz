@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="NoteEz-Server/NoteEz-Server.csproj" />
+  <Project Path="NoteEz-Server.Tests/NoteEz-Server.Tests.csproj" />
 </Solution>
