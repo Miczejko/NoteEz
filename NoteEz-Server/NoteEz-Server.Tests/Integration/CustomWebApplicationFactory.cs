@@ -30,8 +30,8 @@ namespace NoteEz_Server.Tests.Integration
                     ["Jwt:Issuer"] = "NoteEzTests",
                     ["Jwt:Audience"] = "NoteEzTests",
                     ["ConnectionStrings:DefaultConnection"] = "Server=unused;Database=unused;Trusted_Connection=True;",
-                    ["ConnectionStrings:AzureBlobStorage"] = "UseDevelopmentStorage=true",
-                    ["AzureBlobStorage:ContainerName"] = "test-audio",
+                    ["ConnectionStrings:BlobStorage"] = "UseDevelopmentStorage=true",
+                    ["BlobStorage:ContainerName"] = "test-audio",
                 });
             });
 

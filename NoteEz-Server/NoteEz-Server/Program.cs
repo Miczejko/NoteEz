@@ -73,12 +73,12 @@ builder.Services.AddScoped<EmailService>();
 builder.Services.AddHttpClient<TurnstileService>();
 builder.Services.AddSingleton(sp =>
 {
-    // Azure App Service blokuje Application Settings, ktorych WARTOSC wyglada jak
-    // connection string (np. zawiera "AccountKey=") - taka wartosc musi isc przez
-    // osobna sekcje "Connection strings" (tak samo jak baza danych), stad odczyt
-    // przez GetConnectionString zamiast zwyklego klucza konfiguracji.
-    var connectionString = builder.Configuration.GetConnectionString("AzureBlobStorage");
-    var containerName = builder.Configuration["AzureBlobStorage:ContainerName"];
+    // Azure App Service blokuje Application Settings pod prefiksem "AzureBlobStorage"
+    // (rezerwuje ten wzorzec nazwy dla wlasnej integracji ze Storage) - stad inna
+    // nazwa sekcji. Sam connection string i tak idzie przez "Connection strings",
+    // bo jego wartosc wyglada jak connection string (zawiera "AccountKey=").
+    var connectionString = builder.Configuration.GetConnectionString("BlobStorage");
+    var containerName = builder.Configuration["BlobStorage:ContainerName"];
 
     var blobServiceClient = new BlobServiceClient(connectionString);
     var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
