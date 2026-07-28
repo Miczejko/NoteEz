@@ -1,0 +1,11 @@
+{
+  "name": "noteez-frontend",
+  "compatibility_date": "2026-01-01",
+  "assets": {
+    // katalog wyjsciowy "vite build" - Cloudflare Workers serwuje z niego statyczne pliki
+    "directory": "./dist",
+    // bez tego odswiezenie strony na /notes albo /account daloby 404 - router uzywa
+    // createWebHistory (ladne URL-e), wiec kazda nieznaleziona sciezka musi trafic do index.html
+    "not_found_handling": "single-page-application"
+  }
+}
