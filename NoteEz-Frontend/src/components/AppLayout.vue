@@ -1,6 +1,7 @@
 <script setup>
 import { useAuthStore } from '../stores/auth'
 import { useRouter } from 'vue-router'
+import AppFooter from './AppFooter.vue'
 
 defineProps({
   showNav: { type: Boolean, default: true },
@@ -29,6 +30,7 @@ async function handleLogout() {
     <main class="main">
       <slot />
     </main>
+    <AppFooter />
   </div>
 </template>
 

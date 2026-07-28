@@ -1,5 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { requestKioskFullscreen, toggleFullscreen } from '../utils/device'
+import ToolbarIcon from './ToolbarIcon.vue'
 
 const props = defineProps({
   strokesJson: { type: String, default: null },
@@ -23,6 +25,11 @@ const strokeWidth = ref(3)
 const tool = ref('draw') // 'draw' | 'erase'
 const eraserSize = ref(24)
 
+// User-chosen canvas size (persisted alongside the strokes). Null means
+// "auto-size to fit the drawn content", the previous fixed behavior.
+const manualSize = ref(null)
+const resizing = ref(false)
+
 let ctx = null
 let lastPointTime = 0
 // Shift applied when rendering so the drawing's bounding box starts at
@@ -30,23 +37,23 @@ let lastPointTime = 0
 let offsetX = 0
 let offsetY = 0
 
-function parseStrokes(json) {
-  if (!json) return []
+function parseDrawingData(json) {
+  if (!json) return { strokes: [], size: null }
   try {
     // Handle case where json might already be an object (shouldn't happen, but be safe)
-    if (typeof json === 'object') {
-      return json.strokes || []
-    }
-    // Handle case where json might be double-encoded
-    let data = JSON.parse(json)
+    let data = typeof json === 'object' ? json : JSON.parse(json)
     // If we get a string instead of an object, it was double-encoded
     if (typeof data === 'string') {
       data = JSON.parse(data)
     }
-    return data.strokes || []
+    const size =
+      Number.isFinite(data.canvasWidth) && Number.isFinite(data.canvasHeight)
+        ? { width: data.canvasWidth, height: data.canvasHeight }
+        : null
+    return { strokes: data.strokes || [], size }
   } catch (e) {
     console.warn('Failed to parse strokes:', e, 'Input:', json)
-    return []
+    return { strokes: [], size: null }
   }
 }
 
@@ -95,7 +102,7 @@ function resizeCanvas() {
   if (!canvas) return
   const container = canvas.parentElement
 
-  // Get optimal dimensions based on drawing content - this is the fixed
+  // Dimensions based on drawing content and any manual resize - this is the
   // drawing resolution (and the coordinate space strokes are stored in).
   const { width, height, padding, bounds } = getOptimalCanvasDimensions()
 
@@ -148,9 +155,36 @@ function eraseAt(pos) {
   if (strokes.value.length !== before) redraw()
 }
 
+// Some browsers (e.g. the Samsung Family Hub's built-in browser) reveal
+// their own UI chrome on any scroll delta, even a tiny one absorbed by
+// touch-action/preventDefault. Freezing the page in place for the duration
+// of a touch drag removes that scroll delta entirely.
+let savedScrollY = 0
+let scrollLocked = false
+
+function lockPageScroll() {
+  if (scrollLocked) return
+  scrollLocked = true
+  savedScrollY = window.scrollY
+  document.body.classList.add('drawing-scroll-lock')
+  document.body.style.top = `-${savedScrollY}px`
+}
+
+function unlockPageScroll() {
+  if (!scrollLocked) return
+  scrollLocked = false
+  document.body.classList.remove('drawing-scroll-lock')
+  document.body.style.top = ''
+  window.scrollTo(0, savedScrollY)
+}
+
 function startDraw(e) {
   if (props.readonly) return
   e.preventDefault()
+  if (e.touches) {
+    lockPageScroll()
+    requestKioskFullscreen()
+  }
   const pos = getPos(e)
   if (tool.value === 'erase') {
     isDrawing.value = true
@@ -183,6 +217,7 @@ function moveDraw(e) {
 }
 
 function endDraw() {
+  unlockPageScroll()
   if (!isDrawing.value) return
   isDrawing.value = false
   if (currentStroke.value && currentStroke.value.points.length >= 2) {
@@ -203,7 +238,12 @@ function clear() {
 }
 
 function save() {
-  const json = JSON.stringify({ strokes: strokes.value })
+  const canvas = canvasRef.value
+  const json = JSON.stringify({
+    strokes: strokes.value,
+    canvasWidth: canvas?.width,
+    canvasHeight: canvas?.height,
+  })
   emit('save', json)
 }
 
@@ -238,17 +278,80 @@ function getOptimalCanvasDimensions() {
   const bounds = calculateDrawingBounds(strokes.value)
   const padding = 20 // Add padding around drawing
 
-  const width = Math.max(100, bounds.maxX - bounds.minX + padding * 2)
-  const height = Math.max(250, bounds.maxY - bounds.minY + padding * 2)
+  // Content must always fit — this is the smallest the canvas can be.
+  const minWidth = Math.max(100, bounds.maxX - bounds.minX + padding * 2)
+  const minHeight = Math.max(250, bounds.maxY - bounds.minY + padding * 2)
 
-  return { width, height, padding, bounds }
+  const width = manualSize.value ? Math.max(minWidth, manualSize.value.width) : minWidth
+  const height = manualSize.value ? Math.max(minHeight, manualSize.value.height) : minHeight
+
+  return { width, height, padding, bounds, minWidth, minHeight }
+}
+
+// How large the canvas is allowed to grow to, based on the actual space
+// available in the surrounding editor — so it can never spill off-screen.
+function getMaxCanvasWidth() {
+  const canvas = canvasRef.value
+  const bound = canvas?.closest('.ProseMirror') || canvas?.closest('.editor-content')
+  if (bound) {
+    const style = window.getComputedStyle(bound)
+    const paddingX = parseFloat(style.paddingLeft || 0) + parseFloat(style.paddingRight || 0)
+    return Math.max(150, bound.getBoundingClientRect().width - paddingX)
+  }
+  return Math.max(150, window.innerWidth - 48)
+}
+
+function getMaxCanvasHeight() {
+  return Math.max(150, window.innerHeight * 0.75)
+}
+
+function startResize(e) {
+  if (props.readonly) return
+  e.preventDefault()
+  const canvas = canvasRef.value
+  if (!canvas) return
+  const clientX = (evt) => (evt.touches ? evt.touches[0].clientX : evt.clientX)
+  const clientY = (evt) => (evt.touches ? evt.touches[0].clientY : evt.clientY)
+  const startX = clientX(e)
+  const startY = clientY(e)
+  const startWidth = canvas.width
+  const startHeight = canvas.height
+  const maxWidth = getMaxCanvasWidth()
+  const maxHeight = getMaxCanvasHeight()
+  const { minWidth, minHeight } = getOptimalCanvasDimensions()
+  resizing.value = true
+  if (e.touches) lockPageScroll()
+
+  function onMove(moveEvent) {
+    moveEvent.preventDefault()
+    const newWidth = Math.min(maxWidth, Math.max(minWidth, startWidth + (clientX(moveEvent) - startX)))
+    const newHeight = Math.min(maxHeight, Math.max(minHeight, startHeight + (clientY(moveEvent) - startY)))
+    manualSize.value = { width: newWidth, height: newHeight }
+    resizeCanvas()
+  }
+
+  function onEnd() {
+    resizing.value = false
+    unlockPageScroll()
+    window.removeEventListener('mousemove', onMove)
+    window.removeEventListener('mouseup', onEnd)
+    window.removeEventListener('touchmove', onMove)
+    window.removeEventListener('touchend', onEnd)
+  }
+
+  window.addEventListener('mousemove', onMove)
+  window.addEventListener('mouseup', onEnd)
+  window.addEventListener('touchmove', onMove, { passive: false })
+  window.addEventListener('touchend', onEnd)
 }
 
 watch(
   () => props.strokesJson,
   (val) => {
-    strokes.value = parseStrokes(val)
-    redraw()
+    const parsed = parseDrawingData(val)
+    strokes.value = parsed.strokes
+    manualSize.value = parsed.size
+    resizeCanvas()
   },
   { immediate: true }
 )
@@ -260,6 +363,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', resizeCanvas)
+  unlockPageScroll()
 })
 </script>
 
@@ -302,7 +406,7 @@ onUnmounted(() => {
           title="Rysuj"
           @click="tool = 'draw'"
         >
-          ✏️ Rysuj
+          <ToolbarIcon name="drawing" /> Rysuj
         </button>
         <button
           class="btn btn-sm"
@@ -310,12 +414,13 @@ onUnmounted(() => {
           title="Gumka"
           @click="tool = 'erase'"
         >
-          🧹 Gumka
+          <ToolbarIcon name="eraser" /> Gumka
         </button>
       </div>
       <div class="toolbar-actions">
         <button class="btn btn-ghost btn-sm" @click="undo" :disabled="!strokes.length">Cofnij</button>
         <button class="btn btn-ghost btn-sm" @click="clear" :disabled="!strokes.length">Wyczyść</button>
+        <button class="btn btn-ghost btn-sm" title="Pełny ekran" @click="toggleFullscreen"><ToolbarIcon name="fullscreen" /></button>
         <button class="btn btn-accent btn-sm" @click="save">Zapisz rysunek</button>
       </div>
     </div>
@@ -331,6 +436,14 @@ onUnmounted(() => {
         @touchstart="startDraw"
         @touchmove="moveDraw"
         @touchend="endDraw"
+      />
+      <div
+        v-if="!readonly"
+        class="resize-handle"
+        :class="{ resizing }"
+        title="Przeciągnij, aby zmienić rozmiar płótna"
+        @mousedown="startResize"
+        @touchstart="startResize"
       />
     </div>
   </div>
@@ -430,20 +543,39 @@ onUnmounted(() => {
 }
 
 .canvas-wrap {
+  position: relative;
   border: 2px solid var(--color-border);
   border-radius: var(--radius-sm);
   overflow: hidden;
   background: white;
+}
+
+.resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+  background: linear-gradient(135deg, transparent 50%, var(--color-primary) 50%);
+  cursor: nwse-resize;
   touch-action: none;
+}
+
+.resize-handle.resizing {
+  filter: brightness(1.2);
 }
 
 .canvas {
   display: block;
   cursor: crosshair;
+  /* Block panning/scrolling only while touching an editable canvas - a
+     readonly drawing shown in the note body must not swallow page scroll. */
+  touch-action: none;
 }
 
 .canvas.readonly {
   cursor: default;
+  touch-action: auto;
 }
 
 .canvas.erasing {

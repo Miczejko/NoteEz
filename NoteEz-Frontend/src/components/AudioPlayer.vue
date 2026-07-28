@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import api from '../api/client'
+import ToolbarIcon from './ToolbarIcon.vue'
 
 const props = defineProps({
   noteId: { type: String, required: true },
@@ -42,13 +43,13 @@ onUnmounted(() => {
 <template>
   <div class="audio-player card">
     <div class="player-info">
-      <span class="player-icon">🎙</span>
+      <span class="player-icon"><ToolbarIcon name="mic" /></span>
       <span class="player-duration">{{ formatTime(durationSeconds) }}</span>
     </div>
     <div v-if="loading" class="player-loading">Ładowanie…</div>
     <audio v-else-if="audioUrl" :src="audioUrl" controls class="player-audio" />
     <span v-else-if="error" class="error-msg">Błąd odtwarzania</span>
-    <button class="btn btn-ghost btn-sm delete-btn" title="Usuń" @click="emit('delete')">🗑</button>
+    <button class="btn btn-ghost btn-sm delete-btn" title="Usuń" @click="emit('delete')"><ToolbarIcon name="trash" /></button>
   </div>
 </template>
 
@@ -68,7 +69,7 @@ onUnmounted(() => {
 }
 
 .player-icon {
-  font-size: 1.25rem;
+  display: inline-flex;
 }
 
 .player-duration {

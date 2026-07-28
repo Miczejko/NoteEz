@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { nodeViewProps, NodeViewWrapper } from '@tiptap/vue-3'
 import DrawingCanvas from './DrawingCanvas.vue'
+import ToolbarIcon from './ToolbarIcon.vue'
 import { useNotesStore } from '../stores/notes'
 
 const props = defineProps(nodeViewProps)
@@ -63,7 +64,7 @@ function handleEdit() {
       <div v-else class="drawing-readonly">
         <DrawingCanvas :strokes-json="drawing?.strokesJson" readonly />
         <div class="drawing-node-actions">
-          <button type="button" class="btn btn-secondary btn-sm" @click="handleEdit">✎ Edytuj</button>
+          <button type="button" class="btn btn-secondary btn-sm" @click="handleEdit"><ToolbarIcon name="drawing" /> Edytuj</button>
           <button type="button" class="btn btn-ghost btn-sm delete-drawing" @click="handleDelete">Usuń</button>
         </div>
       </div>

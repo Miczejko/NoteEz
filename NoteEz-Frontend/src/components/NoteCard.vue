@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { tiptapToPlainText } from '../utils/tiptapText'
+import ToolbarIcon from './ToolbarIcon.vue'
 
 const props = defineProps({
   note: { type: Object, required: true },
@@ -32,8 +33,8 @@ function formatDate(dateStr) {
     </div>
     <p v-if="previewText" class="note-preview">{{ previewText }}</p>
     <div class="note-badges">
-      <span v-if="note.drawings?.length" class="badge badge-drawing">🖊 Rysunek</span>
-      <span v-if="note.audioClips?.length" class="badge badge-audio">🎙 Głosówka</span>
+      <span v-if="note.drawings?.length" class="badge badge-drawing"><ToolbarIcon name="drawing" /> Rysunek</span>
+      <span v-if="note.audioClips?.length" class="badge badge-audio"><ToolbarIcon name="mic" /> Głosówka</span>
     </div>
   </router-link>
 </template>
@@ -108,6 +109,9 @@ function formatDate(dateStr) {
 }
 
 .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   font-size: 0.75rem;
   padding: 0.2rem 0.625rem;
   border-radius: 999px;

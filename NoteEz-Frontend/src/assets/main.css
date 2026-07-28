@@ -35,7 +35,9 @@
 html {
   font-size: 16px;
   -webkit-text-size-adjust: 100%;
-  overflow-x: hidden;
+  /* "clip" (not "hidden") - "hidden" makes html/body scroll containers,
+     which silently breaks position:sticky on every descendant. */
+  overflow-x: clip;
 }
 
 body {
@@ -44,15 +46,21 @@ body {
   color: var(--color-text);
   line-height: 1.5;
   min-height: 100dvh;
-  overflow-x: hidden;
-  /* domyslnie auto - pozwala na "pull to refresh" u gory strony.
-     Przy dojechaniu do samego dolu main.js przelacza to na "none",
-     zeby zablokowac odbicie/skok na gore, ktore tam bylo mylace. */
-  overscroll-behavior-y: auto;
+  /* "clip" (not "hidden") - "hidden" makes html/body scroll containers,
+     which silently breaks position:sticky on every descendant. */
+  overflow-x: clip;
 }
 
-body.at-bottom {
-  overscroll-behavior-y: none;
+/* While actively touch-dragging on a drawing canvas: freeze the page at its
+   current scroll position. Some browsers (e.g. Samsung Family Hub's) reveal
+   their own UI chrome on any scroll delta - this removes that delta entirely
+   instead of relying on preventDefault()/touch-action, which they may not
+   fully honor for edge-swipe gestures. */
+body.drawing-scroll-lock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  overflow: hidden;
 }
 
 #app {

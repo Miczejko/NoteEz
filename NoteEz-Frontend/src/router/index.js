@@ -8,6 +8,11 @@ const routes = [
     component: () => import('../views/HomeView.vue'),
   },
   {
+    path: '/polityka-prywatnosci',
+    name: 'privacy-policy',
+    component: () => import('../views/PrivacyPolicyView.vue'),
+  },
+  {
     path: '/login',
     name: 'login',
     component: () => import('../views/LoginView.vue'),

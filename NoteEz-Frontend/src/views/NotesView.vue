@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useNotesStore } from '../stores/notes'
 import AppLayout from '../components/AppLayout.vue'
 import NoteCard from '../components/NoteCard.vue'
+import ToolbarIcon from '../components/ToolbarIcon.vue'
 
 const notesStore = useNotesStore()
 const router = useRouter()
@@ -33,10 +34,11 @@ async function handleCreate() {
 <template>
   <AppLayout>
     <div class="notes-page">
+      <div class="notes-glow" aria-hidden="true" />
       <div class="page-header">
         <h1>Moje notatki</h1>
         <div class="page-header-actions">
-          <router-link to="/devices" class="btn btn-outline">📟 Urządzenia</router-link>
+          <router-link to="/devices" class="btn btn-outline"><ToolbarIcon name="device" /> Urządzenia</router-link>
           <button class="btn btn-primary" @click="showCreate = !showCreate">
             {{ showCreate ? 'Anuluj' : '+ Nowa notatka' }}
           </button>
@@ -60,7 +62,7 @@ async function handleCreate() {
       <div v-if="notesStore.loading" class="state-msg">Ładowanie notatek…</div>
       <div v-else-if="notesStore.error" class="state-msg error-msg">{{ notesStore.error }}</div>
       <div v-else-if="!notesStore.notes.length" class="empty-state card">
-        <span class="empty-icon">📋</span>
+        <span class="empty-icon"><ToolbarIcon name="clipboard" /></span>
         <p>Brak notatek. Utwórz pierwszą!</p>
       </div>
       <div v-else class="notes-grid">
@@ -72,9 +74,35 @@ async function handleCreate() {
 
 <style scoped>
 .notes-page {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+}
+
+/* Same decorative glow + dot grid as the marketing home page. Fixed (not
+   absolute) so it spans the full viewport width instead of being boxed in
+   by AppLayout's centered, max-width .main - and a negative z-index keeps
+   it behind all content without needing every child repositioned above it. */
+.notes-glow {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(121, 199, 197, 0.14), transparent 45%),
+    radial-gradient(circle at 90% 10%, rgba(153, 209, 156, 0.12), transparent 42%),
+    radial-gradient(circle at 50% 60%, rgba(115, 171, 132, 0.08), transparent 55%);
+}
+
+.notes-glow::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(234, 245, 240, 0.08) 1px, transparent 1px);
+  background-size: 26px 26px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 55% at 50% 10%, black, transparent 70%);
+  mask-image: radial-gradient(ellipse 70% 55% at 50% 10%, black, transparent 70%);
 }
 
 .page-header {
@@ -122,9 +150,14 @@ async function handleCreate() {
 }
 
 .empty-icon {
-  font-size: 3rem;
-  display: block;
+  display: flex;
+  justify-content: center;
   margin-bottom: 0.75rem;
+}
+
+.empty-icon :deep(svg) {
+  width: 3rem;
+  height: 3rem;
 }
 
 .state-msg {

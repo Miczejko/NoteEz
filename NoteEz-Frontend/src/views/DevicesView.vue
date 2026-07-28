@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useDevicesStore } from '../stores/devices'
 import AppLayout from '../components/AppLayout.vue'
+import ToolbarIcon from '../components/ToolbarIcon.vue'
 
 const devicesStore = useDevicesStore()
 
@@ -95,7 +96,7 @@ async function handleRevoke(deviceId) {
         <div v-if="devicesStore.loading" class="state-msg">Ładowanie urządzeń…</div>
         <div v-else-if="devicesStore.error" class="state-msg error-msg">{{ devicesStore.error }}</div>
         <div v-else-if="!devicesStore.devices.length" class="empty-state card">
-          <span class="empty-icon">📟</span>
+          <span class="empty-icon"><ToolbarIcon name="device" /></span>
           <p>Brak sparowanych urządzeń. Sparuj swoje ESP32!</p>
         </div>
         <div v-else class="devices-list">
@@ -107,7 +108,7 @@ async function handleRevoke(deviceId) {
           >
             <div class="device-info">
               <div class="device-name-row">
-                <span class="device-icon">📟</span>
+                <span class="device-icon"><ToolbarIcon name="device" /></span>
                 <span class="device-name">{{ device.name || 'Bez nazwy' }}</span>
                 <span v-if="device.revoked" class="badge badge-revoked">Odwołane</span>
                 <span v-else class="badge badge-active">Aktywne</span>
@@ -232,7 +233,7 @@ async function handleRevoke(deviceId) {
 }
 
 .device-icon {
-  font-size: 1.125rem;
+  display: inline-flex;
 }
 
 .device-name {
@@ -271,9 +272,14 @@ async function handleRevoke(deviceId) {
 }
 
 .empty-icon {
-  font-size: 3rem;
-  display: block;
+  display: flex;
+  justify-content: center;
   margin-bottom: 0.75rem;
+}
+
+.empty-icon :deep(svg) {
+  width: 3rem;
+  height: 3rem;
 }
 
 .state-msg {

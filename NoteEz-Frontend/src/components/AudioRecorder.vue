@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onUnmounted } from 'vue'
+import ToolbarIcon from './ToolbarIcon.vue'
 
 const emit = defineEmits(['recorded'])
 
@@ -74,7 +75,7 @@ onUnmounted(() => {
         class="btn btn-secondary rec-btn"
         @click="startRecording"
       >
-        🎙 Nagraj głosówkę
+        <ToolbarIcon name="mic" /> Nagraj głosówkę
       </button>
       <template v-else>
         <span class="rec-indicator">

@@ -5,6 +5,22 @@
 #include <ArduinoJson.h>   // https://arduinojson.org
 #include <Preferences.h>
 #include <vector>
+#include <esp_sleep.h>
+#include <driver/gpio.h>
+
+// ---- usypianie (deep sleep) po bezczynnosci ----
+// T_IRQ (linia przerwania dotyku z XPT2046, aktywna stanem niskim) - musi byc podpieta pod
+// pin z domeny LP-IO, bo tylko takie piny moga wybudzic ESP32-C6 z deep sleep. Na tej plytce
+// GPIO0/2/6/7 sa zajete przez magistrale SPI, a GPIO4/5 to piny strappingowe (nie ruszac) -
+// GPIO3 to najbezpieczniejszy wolny pin w zakresie 0-7.
+#define TIRQ_PIN 3
+#define IDLE_SLEEP_MS 60000 // 1 minuta bezczynnosci -> deep sleep
+
+// Podswietlenie (BLK/LED modulu) przepiete z 3.3V na GPIO10, zeby dalo sie je zgasic
+// programowo przed usypianiem. GPIO10 nie koliduje z SPI (0/2/6/7) ani ze strappingiem (4/5),
+// wiec jest bezpiecznym wyborem do zwyklego sterowania cyfrowego (nie musi byc pinem LP-IO,
+// bo tylko GO/wylaczamy je - nie budzimy sie przez niego).
+#define BACKLIGHT_PIN 10
 
 class LGFX : public lgfx::LGFX_Device {
   lgfx::Panel_ST7789 _panel_instance;
@@ -136,6 +152,8 @@ int notesCount = 0;
 #define LIST_CONTENT_BOTTOM 200 // ponizej tego zaczynaja sie przyciski scrolla listy
 int listScrollRow = 0; // indeks pierwszej widocznej notatki na liscie
 
+unsigned long lastActivityMillis = 0; // czas ostatniego dotkniecia - do usypiania po bezczynnosci
+
 // ---- ekran szczegółów notatki ----
 enum Screen { SCREEN_LIST, SCREEN_DETAIL, SCREEN_DRAWING };
 Screen currentScreen = SCREEN_LIST;
@@ -263,6 +281,101 @@ bool claimDevice(const String& code) {
   showMessage("Sparowano!", "", COLOR_ACCENT_MINT);
   delay(1500);
   return true;
+}
+
+// ---- TYMCZASOWY TEST DIAGNOSTYCZNY: light sleep zamiast deep sleep ----
+// Light sleep budzi sie z DOWOLNEGO GPIO (gpio_wakeup_enable), bez ograniczenia do domeny
+// LP-IO i bez niskopoziomowych zaleznosci ktore w deep sleep mogly nie byc poprawnie
+// obslugiwane przez pakiet plytek "Arduino ESP32 Boards" 2.0.18. Jesli TO zadziala,
+// wiemy ze wiring/dotyk sa ok, a problem siedzi konkretnie w deep sleep na tym rdzeniu.
+// Po teście podmien z powrotem wywolanie w loop() na enterDeepSleep().
+void enterLightSleepTest() {
+  showMessage("Usypianie (TEST light sleep)", "Dotknij ekranu, aby wybudzic", COLOR_TEXT_MUTED);
+  delay(300);
+
+  display.sleep();
+  digitalWrite(BACKLIGHT_PIN, LOW);
+
+  pinMode(TIRQ_PIN, INPUT_PULLUP);
+  delay(10);
+  Serial.printf("[light-sleep-test] T_IRQ (GPIO%d) stan przed usnieciem: %d\n", TIRQ_PIN, digitalRead(TIRQ_PIN));
+  Serial.flush();
+
+  // Aktywne polaczenie WiFi STA potrafi kolidowac z reczmym wejsciem w sleep (modem
+  // proby utrzymania polaczenia moga przerywac/destabilizowac cykl usypiania). Wylaczamy
+  // radio calkowicie na czas testu - i tak zaraz zestawiamy je od nowa po wybudzeniu.
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
+  delay(100);
+
+  gpio_wakeup_enable((gpio_num_t)TIRQ_PIN, GPIO_INTR_LOW_LEVEL);
+  esp_sleep_enable_gpio_wakeup();
+
+  esp_light_sleep_start(); // W ODROZNIENIU OD deep sleep - TO WRACA po wybudzeniu, kod leci dalej
+
+  // TYMCZASOWA DIAGNOSTYKA: krok po kroku, zeby zlokalizowac dokladnie gdzie sie wiesza.
+  Serial.println("[T1] po esp_light_sleep_start()");
+  Serial.flush();
+
+  digitalWrite(BACKLIGHT_PIN, HIGH);
+  Serial.println("[T2] po digitalWrite BACKLIGHT HIGH");
+  Serial.flush();
+
+  display.wakeup();
+  Serial.println("[T3] po display.wakeup()");
+  Serial.flush();
+
+  WiFi.mode(WIFI_STA);
+  Serial.println("[T4] po WiFi.mode(WIFI_STA)");
+  Serial.flush();
+
+  WiFi.begin(); // wraca do ostatnio zapamietanej sieci (dane trzyma WiFiManager/NVS)
+  Serial.println("[T5] po WiFi.begin()");
+  Serial.flush();
+
+  lastActivityMillis = millis();
+  renderNotesList();
+  Serial.println("[T6] po renderNotesList() - koniec funkcji");
+  Serial.flush();
+}
+
+// ---- usypia urzadzenie po minucie bezczynnosci; budzi je dotkniecie ekranu (T_IRQ na GPIO3) ----
+// Deep sleep resetuje cala pamiec RAM - po wybudzeniu kod zaczyna sie od nowa od setup(),
+// ktory i tak od razu laczy sie z zapisanym WiFi i odswieza liste notatek, wiec efekt dla
+// uzytkownika jest taki, jakby urzadzenie po prostu "obudzilo sie" na ekranie listy.
+void enterDeepSleep() {
+  showMessage("Usypianie...", "Dotknij ekranu, aby wybudzic", COLOR_TEXT_MUTED);
+  delay(300);
+
+  display.sleep(); // usypia sam panel (ST7789 SLPIN)
+
+  // Gasimy podswietlenie i "zatrzaskujemy" ten stan na czas snu (gpio_hold) - bez tego
+  // pad wraca do stanu domyslnego po wejsciu w deep sleep i podswietlenie zapala sie z powrotem.
+  // (ESP32-C6 nie ma oddzielnej domeny RTC GPIO jak klasyczny ESP32, wiec nie ma tu globalnego
+  // przelacznika gpio_deep_sleep_hold_en/dis - samo gpio_hold_en na pinie wystarczy.)
+  digitalWrite(BACKLIGHT_PIN, LOW);
+  gpio_hold_en((gpio_num_t)BACKLIGHT_PIN);
+
+  // XPT2046 IRQ jest open-drain (aktywne niskim) - INPUT_PULLUP zapewnia stan wysoki w spoczynku,
+  // bez tego pin moglby "plywac" i wybudzanie byloby niewiarygodne/nie dzialaloby wcale.
+  pinMode(TIRQ_PIN, INPUT_PULLUP);
+  delay(10); // czas na ustalenie sie stanu linii po zmianie pinMode
+
+  // Diagnostyka: 1 = spoczynek (dobrze), 0 = albo dotkniete w tej chwili, albo pin
+  // nie ma podciagniecia i "plywa" na LOW - jesli to drugie, wybudzanie nigdy sie nie uda.
+  Serial.printf("[sleep] T_IRQ (GPIO%d) stan przed usnieciem: %d\n", TIRQ_PIN, digitalRead(TIRQ_PIN));
+
+  esp_err_t wakeErr = esp_deep_sleep_enable_gpio_wakeup(1ULL << TIRQ_PIN, ESP_GPIO_WAKEUP_GPIO_LOW);
+  Serial.printf("[sleep] esp_deep_sleep_enable_gpio_wakeup zwrocilo: %d (0 = ESP_OK)\n", (int)wakeErr);
+  Serial.flush();
+
+  // Aktywne polaczenie WiFi STA tuz przed wejsciem w sleep potrafi destabilizowac sam moment
+  // usypiania - czyste rozlaczenie przed esp_deep_sleep_start() jest zalecana praktyka.
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
+  delay(100);
+
+  esp_deep_sleep_start(); // nie wraca - reset i ponowne setup() po wybudzeniu
 }
 
 // ---- kasuje WiFi + parowanie i wraca do portalu konfiguracyjnego ----
@@ -744,6 +857,21 @@ void renderDrawingScreen(int index) {
 
 void setup() {
   Serial.begin(115200);
+  delay(200); // czas dla monitora Serial, zeby zdazyl sie podlaczyc po restarcie z deep sleep
+
+  // Diagnostyka: pokazuje czy ten start to powrot z deep sleep (i przez co), czy zwykly reset/wgranie.
+  // ESP_SLEEP_WAKEUP_GPIO (touch zadzialal) / ESP_SLEEP_WAKEUP_UNDEFINED (zwykly reset/power-on).
+  Serial.printf("[boot] przyczyna wybudzenia: %d\n", (int)esp_sleep_get_wakeup_cause());
+
+  // Zwalnia "zatrzask" (gpio_hold) z ewentualnego poprzedniego deep sleep i wlacza
+  // podswietlenie na nowo - bez tego pin zostalby zablokowany na stanie niskim z ostatniego snu.
+  gpio_hold_dis((gpio_num_t)BACKLIGHT_PIN);
+  pinMode(BACKLIGHT_PIN, OUTPUT);
+  digitalWrite(BACKLIGHT_PIN, HIGH);
+
+  // TYMCZASOWA DIAGNOSTYKA: konfigurujemy T_IRQ od razu przy starcie (nie dopiero przed
+  // usnieciem), zeby test w loop() mial wiarygodny, zdefiniowany odczyt od pierwszej sekundy.
+  pinMode(TIRQ_PIN, INPUT_PULLUP);
 
   display.init();
   display.setRotation(1);
@@ -804,6 +932,8 @@ void setup() {
   }
 
   fetchNotesLite();
+
+  lastActivityMillis = millis(); // liczy sie tez czas od ostatniego uzycia przed usypianiem
 }
 
 void loop() {
@@ -815,9 +945,14 @@ void loop() {
 
   if (!touched) {
     resetTouchStart = 0;
+    if (millis() - lastActivityMillis > IDLE_SLEEP_MS) {
+      enterLightSleepTest(); // TYMCZASOWO na potrzeby testu - docelowo enterDeepSleep()
+    }
     delay(20);
     return;
   }
+
+  lastActivityMillis = millis();
 
   if (currentScreen == SCREEN_LIST) {
     if (pointInRect(x, y, REFRESH_BTN_X, REFRESH_BTN_Y, REFRESH_BTN_W, REFRESH_BTN_H)) {

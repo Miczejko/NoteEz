@@ -97,6 +97,7 @@ onBeforeUnmount(() => {
       </button>
     </div>
     <EditorContent :editor="editor" class="editor-content input-field" />
+    <div class="keyboard-spacer" aria-hidden="true" />
   </div>
 </template>
 
@@ -112,6 +113,13 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   gap: 0.25rem;
   align-items: center;
+  position: sticky;
+  /* Sits just below AppLayout's own sticky header (4rem tall). */
+  top: 4rem;
+  z-index: 10;
+  background: var(--color-bg);
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .toolbar button {
@@ -183,6 +191,14 @@ onBeforeUnmount(() => {
 
 .editor-content {
   min-height: 200px;
+}
+
+.keyboard-spacer {
+  /* Always-present extra scroll room, so there's room to scroll text clear
+     of an on-screen keyboard even when it covers text near the bottom of
+     the note - not conditional on any focus/viewport event, since those
+     don't fire reliably on every browser (e.g. embedded kiosk browsers). */
+  height: 50vh;
 }
 
 .editor-content :deep(.ProseMirror) {
