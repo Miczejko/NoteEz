@@ -73,7 +73,10 @@ builder.Services.AddScoped<EmailService>();
 builder.Services.AddHttpClient<TurnstileService>();
 builder.Services.AddSingleton(sp =>
 {
-    var connectionString = builder.Configuration["AzureBlobStorage:ConnectionString"];
+    // nazwa klucza celowo nie konczy sie na "ConnectionString" - Azure App Service
+    // blokuje Application Settings o takiej nazwie (rezerwuje ten wzorzec dla
+    // osobnej sekcji "Connection strings")
+    var connectionString = builder.Configuration["AzureBlobStorage:ConnString"];
     var containerName = builder.Configuration["AzureBlobStorage:ContainerName"];
 
     var blobServiceClient = new BlobServiceClient(connectionString);
