@@ -42,17 +42,23 @@ namespace NoteEz_Server.Models
         [Required, EmailAddress, StringLength(256)]
         string Email,
         [Required, StringLength(100, MinimumLength = 8)]
-        string Password);
+        string Password,
+        [Required]
+        string TurnstileToken);
 
     public record LoginDto(
         [Required, StringLength(32)]
         string Username,
         [Required, StringLength(100)]
-        string Password);
+        string Password,
+        [Required]
+        string TurnstileToken);
 
     public record ForgotPasswordDto(
         [Required, EmailAddress, StringLength(256)]
-        string Email);
+        string Email,
+        [Required]
+        string TurnstileToken);
 
     public record ResetPasswordDto(
         [Required]

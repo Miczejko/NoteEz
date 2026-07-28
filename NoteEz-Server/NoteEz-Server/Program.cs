@@ -70,6 +70,7 @@ builder.Services.AddScoped<NoteService>();
 builder.Services.AddScoped<NoteAudioService>();
 builder.Services.AddScoped<DevicePairingService>();
 builder.Services.AddScoped<EmailService>();
+builder.Services.AddHttpClient<TurnstileService>();
 builder.Services.AddSingleton(sp =>
 {
     var connectionString = builder.Configuration["AzureBlobStorage:ConnectionString"];

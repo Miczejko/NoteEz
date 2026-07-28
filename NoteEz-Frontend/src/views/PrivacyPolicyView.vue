@@ -12,8 +12,8 @@ import AppLayout from '../components/AppLayout.vue'
         <h2>1. Administrator danych</h2>
         <p>
           Administratorem danych osobowych zbieranych za pośrednictwem aplikacji NoteEz jest
-          <strong>[nazwa administratora / firmy]</strong>, kontakt:
-          <strong>[adres e-mail kontaktowy]</strong>. W sprawach dotyczących ochrony danych osobowych
+          <strong>Kacper Miczejko</strong>, kontakt:
+          <strong>noteez-kontakt@outlook.com</strong>. W sprawach dotyczących ochrony danych osobowych
           można kontaktować się pod powyższym adresem.
         </p>
       </section>
@@ -99,7 +99,7 @@ import AppLayout from '../components/AppLayout.vue'
         <h2>9. Kontakt</h2>
         <p>
           W sprawach związanych z ochroną danych osobowych skontaktuj się z nami pod adresem:
-          <strong>[adres e-mail kontaktowy]</strong>.
+          <strong>noteez-kontakt@outlook.com</strong>.
         </p>
       </section>
     </div>

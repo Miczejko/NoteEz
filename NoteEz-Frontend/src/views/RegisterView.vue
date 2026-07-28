@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import AppLayout from '../components/AppLayout.vue'
+import TurnstileWidget from '../components/TurnstileWidget.vue'
 
 const auth = useAuthStore()
 
@@ -12,6 +13,8 @@ const confirmPassword = ref('')
 const error = ref('')
 const loading = ref(false)
 const registered = ref(false)
+const turnstileToken = ref('')
+const turnstileWidget = ref(null)
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9_.-]{3,32}$/
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -34,9 +37,13 @@ async function handleSubmit() {
     error.value = 'Hasła nie są identyczne'
     return
   }
+  if (!turnstileToken.value) {
+    error.value = 'Potwierdź, że nie jesteś botem'
+    return
+  }
   loading.value = true
   try {
-    await auth.register(username.value, email.value, password.value)
+    await auth.register(username.value, email.value, password.value, turnstileToken.value)
     registered.value = true
   } catch (e) {
     const data = e.response?.data
@@ -49,6 +56,8 @@ async function handleSubmit() {
     } else {
       error.value = 'Rejestracja nie powiodła się'
     }
+    turnstileWidget.value?.reset()
+    turnstileToken.value = ''
   } finally {
     loading.value = false
   }
@@ -133,6 +142,11 @@ async function handleSubmit() {
                 required
               />
             </div>
+            <TurnstileWidget
+              ref="turnstileWidget"
+              @verified="turnstileToken = $event"
+              @expired="turnstileToken = ''"
+            />
             <p v-if="error" class="error-msg">{{ error }}</p>
             <button type="submit" class="btn btn-primary auth-submit" :disabled="loading">
               {{ loading ? 'Rejestracja…' : 'Zarejestruj się' }}

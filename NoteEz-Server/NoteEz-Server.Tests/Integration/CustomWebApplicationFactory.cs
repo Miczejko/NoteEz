@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using NoteEz_Server.Data;
+using NoteEz_Server.Services;
 
 namespace NoteEz_Server.Tests.Integration
 {
@@ -44,6 +45,16 @@ namespace NoteEz_Server.Tests.Integration
                 services.RemoveAll<BlobContainerClient>();
                 services.AddSingleton(_ =>
                     new BlobServiceClient("UseDevelopmentStorage=true").GetBlobContainerClient("test-audio"));
+
+                // Prawdziwy EmailService (SendGrid) wymagalby sieci i prawdziwego API key -
+                // podmieniamy na fake, ktory zapisuje linki z maili do TestEmailCapture.
+                services.RemoveAll<EmailService>();
+                services.AddScoped<EmailService, FakeEmailService>();
+
+                // Prawdziwy TurnstileService wywolywalby siec (Cloudflare /siteverify) -
+                // podmieniamy na fake, ktory akceptuje kazdy niepusty token.
+                services.RemoveAll<TurnstileService>();
+                services.AddScoped<TurnstileService, FakeTurnstileService>();
             });
         }
     }

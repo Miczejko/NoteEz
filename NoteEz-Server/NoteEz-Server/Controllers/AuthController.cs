@@ -22,22 +22,39 @@ namespace NoteEz_Server.Controllers
         private readonly AppDbContext _db;
         private readonly IConfiguration _config;
         private readonly EmailService _emailService;
+        private readonly TurnstileService _turnstileService;
 
-        public AuthController(AppDbContext db, IConfiguration config, EmailService emailService)
+        public AuthController(AppDbContext db, IConfiguration config, EmailService emailService, TurnstileService turnstileService)
         {
             _db = db;
             _config = config;
             _emailService = emailService;
+            _turnstileService = turnstileService;
+        }
+
+        private async Task<bool> VerifyCaptchaAsync(string token)
+        {
+            var remoteIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+            return await _turnstileService.VerifyAsync(token, remoteIp);
         }
 
         [HttpPost("register")]
         public async Task<IActionResult> Register(RegisterDto dto)
         {
+            if (!await VerifyCaptchaAsync(dto.TurnstileToken))
+                return BadRequest("Weryfikacja CAPTCHA nie powiodła się. Spróbuj ponownie.");
+
             if (await _db.Users.AnyAsync(u => u.Username == dto.Username))
                 return Conflict("Użytkownik już istnieje.");
 
+            // Nie zdradzamy w odpowiedzi, czy podany e-mail jest juz zajety (enumeration) -
+            // zamiast bledu wysylamy na ten adres informacje o probie rejestracji i konczymy
+            // tak samo, jak przy udanej rejestracji.
             if (await _db.Users.AnyAsync(u => u.Email == dto.Email))
-                return Conflict("Konto z tym adresem e-mail już istnieje.");
+            {
+                await _emailService.SendRegistrationAttemptOnExistingAccountEmailAsync(dto.Email);
+                return Ok();
+            }
 
             // Konto jeszcze nie istnieje - dane czekaja na potwierdzenie e-maila.
             // Usuwamy ewentualne wczesniejsze, niedokonczone proby rejestracji tej samej
@@ -62,7 +79,10 @@ namespace NoteEz_Server.Controllers
             });
             await _db.SaveChangesAsync();
 
-            var backendBaseUrl = $"{Request.Scheme}://{Request.Host}";
+            // Link budujemy z zaufanej, skonfigurowanej wartosci, a nie z naglowka Host -
+            // Host jest kontrolowany przez wywolujacego i mozna by nim podmienic link
+            // wysylany w mailu (host header injection / phishing z zaufanego nadawcy).
+            var backendBaseUrl = _config["App:BackendBaseUrl"]?.TrimEnd('/') ?? "";
             var verificationLink = $"{backendBaseUrl}/api/auth/verify-email?token={rawToken}";
             await _emailService.SendVerificationEmailAsync(dto.Email, verificationLink);
 
@@ -108,6 +128,9 @@ namespace NoteEz_Server.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> ForgotPassword(ForgotPasswordDto dto)
         {
+            if (!await VerifyCaptchaAsync(dto.TurnstileToken))
+                return BadRequest("Weryfikacja CAPTCHA nie powiodła się. Spróbuj ponownie.");
+
             var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
             // Zawsze zwracamy 200 niezaleznie od tego, czy e-mail istnieje w bazie -
             // inaczej formularz zdradzalby, ktore adresy sa zarejestrowane (enumeration).
@@ -192,6 +215,9 @@ namespace NoteEz_Server.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login(LoginDto dto)
         {
+            if (!await VerifyCaptchaAsync(dto.TurnstileToken))
+                return BadRequest("Weryfikacja CAPTCHA nie powiodła się. Spróbuj ponownie.");
+
             var user = await _db.Users.SingleOrDefaultAsync(u => u.Username == dto.Username);
             var passwordOk = BCrypt.Net.BCrypt.Verify(dto.Password, user?.PasswordHash ?? DummyPasswordHash);
 

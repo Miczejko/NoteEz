@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import AppLayout from '../components/AppLayout.vue'
+import TurnstileWidget from '../components/TurnstileWidget.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -12,6 +13,8 @@ const username = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
+const loginTurnstileToken = ref('')
+const loginTurnstileWidget = ref(null)
 
 const info = ref(
   route.query.verified === '1'
@@ -25,25 +28,38 @@ const showForgotPassword = ref(false)
 const forgotEmail = ref('')
 const forgotLoading = ref(false)
 const forgotSent = ref(false)
+const forgotTurnstileToken = ref('')
+const forgotTurnstileWidget = ref(null)
 
 async function handleForgotPassword() {
+  if (!forgotTurnstileToken.value) {
+    return
+  }
   forgotLoading.value = true
   try {
-    await auth.forgotPassword(forgotEmail.value)
+    await auth.forgotPassword(forgotEmail.value, forgotTurnstileToken.value)
     forgotSent.value = true
   } finally {
     forgotLoading.value = false
+    forgotTurnstileWidget.value?.reset()
+    forgotTurnstileToken.value = ''
   }
 }
 
 async function handleSubmit() {
   error.value = ''
+  if (!loginTurnstileToken.value) {
+    error.value = 'Potwierdź, że nie jesteś botem'
+    return
+  }
   loading.value = true
   try {
-    await auth.login(username.value, password.value)
+    await auth.login(username.value, password.value, loginTurnstileToken.value)
     router.push({ name: 'notes' })
   } catch {
     error.value = 'Nieprawidłowa nazwa użytkownika lub hasło'
+    loginTurnstileWidget.value?.reset()
+    loginTurnstileToken.value = ''
   } finally {
     loading.value = false
   }
@@ -86,6 +102,11 @@ async function handleSubmit() {
               required
             />
           </div>
+          <TurnstileWidget
+            ref="loginTurnstileWidget"
+            @verified="loginTurnstileToken = $event"
+            @expired="loginTurnstileToken = ''"
+          />
           <p v-if="error" class="error-msg">{{ error }}</p>
           <button type="submit" class="btn btn-primary auth-submit" :disabled="loading">
             {{ loading ? 'Logowanie…' : 'Zaloguj się' }}
@@ -112,10 +133,15 @@ async function handleSubmit() {
                 required
               />
             </div>
+            <TurnstileWidget
+              ref="forgotTurnstileWidget"
+              @verified="forgotTurnstileToken = $event"
+              @expired="forgotTurnstileToken = ''"
+            />
             <button
               type="button"
               class="btn btn-primary auth-submit"
-              :disabled="forgotLoading"
+              :disabled="forgotLoading || !forgotTurnstileToken"
               @click="handleForgotPassword"
             >
               {{ forgotLoading ? 'Wysyłanie…' : 'Wyślij link do zmiany hasła' }}

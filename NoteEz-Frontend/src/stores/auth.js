@@ -22,17 +22,17 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('username')
   }
 
-  async function register(user, email, password) {
-    await api.post('/auth/register', { username: user, email, password })
+  async function register(user, email, password, turnstileToken) {
+    await api.post('/auth/register', { username: user, email, password, turnstileToken })
   }
 
-  async function login(user, password) {
-    const { data } = await api.post('/auth/login', { username: user, password })
+  async function login(user, password, turnstileToken) {
+    const { data } = await api.post('/auth/login', { username: user, password, turnstileToken })
     setSession(data.accessToken, user)
   }
 
-  async function forgotPassword(userEmail) {
-    await api.post('/auth/password/forgot', { email: userEmail })
+  async function forgotPassword(userEmail, turnstileToken) {
+    await api.post('/auth/password/forgot', { email: userEmail, turnstileToken })
   }
 
   async function requestPasswordChange() {
