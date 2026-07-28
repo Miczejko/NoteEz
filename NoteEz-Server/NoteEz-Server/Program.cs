@@ -27,7 +27,12 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        // Azure SQL Serverless usypia baze przy braku ruchu - pierwsze zapytanie po
+        // przebudzeniu czesto dostaje przejsciowy blad 40613 ("not currently available").
+        // EnableRetryOnFailure automatycznie ponawia takie bledy zamiast od razu wywalac request.
+        sqlOptions => sqlOptions.EnableRetryOnFailure()));
 
 builder.Services.AddAuthentication(options =>
 {
