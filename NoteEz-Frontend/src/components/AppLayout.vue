@@ -1,19 +1,13 @@
 <script setup>
 import { useAuthStore } from '../stores/auth'
-import { useRouter } from 'vue-router'
 import AppFooter from './AppFooter.vue'
+import ToolbarIcon from './ToolbarIcon.vue'
 
 defineProps({
   showNav: { type: Boolean, default: true },
 })
 
 const auth = useAuthStore()
-const router = useRouter()
-
-async function handleLogout() {
-  await auth.logout()
-  router.push({ name: 'login' })
-}
 </script>
 
 <template>
@@ -24,7 +18,15 @@ async function handleLogout() {
       </router-link>
       <div class="header-actions">
         <span v-if="auth.username" class="username">{{ auth.username }}</span>
-        <button class="btn btn-ghost btn-sm" @click="handleLogout">Wyloguj</button>
+        <router-link
+          v-if="auth.isAuthenticated"
+          :to="{ name: 'account' }"
+          class="btn btn-ghost btn-icon settings-link"
+          aria-label="Ustawienia konta"
+          title="Ustawienia konta"
+        >
+          <ToolbarIcon name="gear" :size="22" />
+        </router-link>
       </div>
     </header>
     <main class="main">

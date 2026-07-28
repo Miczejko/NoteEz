@@ -22,13 +22,25 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('username')
   }
 
-  async function register(user, password) {
-    await api.post('/auth/register', { username: user, password })
+  async function register(user, email, password) {
+    await api.post('/auth/register', { username: user, email, password })
   }
 
   async function login(user, password) {
     const { data } = await api.post('/auth/login', { username: user, password })
     setSession(data.accessToken, user)
+  }
+
+  async function forgotPassword(userEmail) {
+    await api.post('/auth/password/forgot', { email: userEmail })
+  }
+
+  async function requestPasswordChange() {
+    await api.post('/auth/password/change-request')
+  }
+
+  async function resetPassword(token, newPassword) {
+    await api.post('/auth/password/reset', { token, newPassword })
   }
 
   async function logout() {
@@ -49,5 +61,16 @@ export const useAuthStore = defineStore('auth', () => {
     return data.accessToken
   }
 
-  return { accessToken, username, isAuthenticated, register, login, logout, refresh }
+  return {
+    accessToken,
+    username,
+    isAuthenticated,
+    register,
+    login,
+    logout,
+    refresh,
+    forgotPassword,
+    requestPasswordChange,
+    resetPassword,
+  }
 })

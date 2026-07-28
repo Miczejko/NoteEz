@@ -17,6 +17,8 @@ namespace NoteEz_Server.Data
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<Device> Devices { get; set; }
         public DbSet<PairingCode> PairingCodes { get; set; }
+        public DbSet<PendingRegistration> PendingRegistrations { get; set; }
+        public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

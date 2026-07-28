@@ -1,11 +1,22 @@
 <script setup>
 defineProps({
   name: { type: String, required: true },
+  size: { type: Number, default: 16 },
 })
 </script>
 
 <template>
-  <svg class="toolbar-icon" viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+  <svg
+    class="toolbar-icon"
+    viewBox="0 0 20 20"
+    :width="size"
+    :height="size"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="1.6"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
     <template v-if="name === 'bold'">
       <path d="M6 4h5a3 3 0 0 1 0 6H6zM6 10h5.5a3 3 0 0 1 0 6H6z" />
     </template>
@@ -64,6 +75,27 @@ defineProps({
       <rect x="5" y="4" width="10" height="13" rx="1.5" />
       <path d="M8 4V3.5A1.5 1.5 0 0 1 9.5 2h1A1.5 1.5 0 0 1 12 3.5V4" />
       <path d="M7.5 9h5M7.5 12h5" />
+    </template>
+    <template v-else-if="name === 'gear'">
+      <g>
+        <rect
+          v-for="angle in [0, 45, 90, 135, 180, 225, 270, 315]"
+          :key="angle"
+          x="8.85"
+          y="2.4"
+          width="2.3"
+          height="2.6"
+          rx="0.5"
+          fill="currentColor"
+          stroke="none"
+          :transform="`rotate(${angle} 10 10)`"
+        />
+        <circle cx="10" cy="10" r="6.1" />
+        <circle cx="10" cy="10" r="2.3" />
+      </g>
+    </template>
+    <template v-else-if="name === 'arrow-left'">
+      <path d="M12.5 4.5 6 10l6.5 5.5" />
     </template>
   </svg>
 </template>

@@ -1,29 +1,24 @@
 <script setup>
 import { ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import AppLayout from '../components/AppLayout.vue'
 
 const auth = useAuthStore()
+const route = useRoute()
+const router = useRouter()
 
-const username = ref('')
-const email = ref('')
+const token = route.query.token || ''
 const password = ref('')
 const confirmPassword = ref('')
 const error = ref('')
 const loading = ref(false)
-const registered = ref(false)
-
-const USERNAME_PATTERN = /^[a-zA-Z0-9_.-]{3,32}$/
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const done = ref(false)
 
 async function handleSubmit() {
   error.value = ''
-  if (!USERNAME_PATTERN.test(username.value)) {
-    error.value = 'Nazwa użytkownika: 3-32 znaki, tylko litery, cyfry, "_", "." i "-"'
-    return
-  }
-  if (!EMAIL_PATTERN.test(email.value)) {
-    error.value = 'Podaj poprawny adres e-mail'
+  if (!token) {
+    error.value = 'Brak tokenu w linku. Sprawdź, czy link jest kompletny.'
     return
   }
   if (password.value.length < 8 || password.value.length > 100) {
@@ -36,19 +31,11 @@ async function handleSubmit() {
   }
   loading.value = true
   try {
-    await auth.register(username.value, email.value, password.value)
-    registered.value = true
+    await auth.resetPassword(token, password.value)
+    done.value = true
   } catch (e) {
     const data = e.response?.data
-    if (typeof data === 'string') {
-      error.value = data
-    } else if (data?.errors) {
-      error.value = Object.values(data.errors).flat().join(' ')
-    } else if (e.response?.status === 409) {
-      error.value = data || 'Użytkownik o tej nazwie lub e-mailu już istnieje'
-    } else {
-      error.value = 'Rejestracja nie powiodła się'
-    }
+    error.value = typeof data === 'string' ? data : 'Nie udało się zmienić hasła. Link mógł wygasnąć.'
   } finally {
     loading.value = false
   }
@@ -58,57 +45,26 @@ async function handleSubmit() {
 <template>
   <AppLayout :show-nav="false">
     <div class="auth-page">
-      <router-link :to="{ name: 'home' }" class="back-link">← Wróć</router-link>
       <div class="auth-card card">
-        <template v-if="registered">
+        <template v-if="done">
           <div class="auth-header">
             <img src="/noteez-logo-tealtext.png" alt="NoteEz" class="auth-icon" />
-            <h1>Sprawdź swoją skrzynkę</h1>
-            <p>
-              Wysłaliśmy link potwierdzający na adres <strong>{{ email }}</strong>. Kliknij go, aby
-              dokończyć zakładanie konta.
-            </p>
+            <h1>Hasło zmienione</h1>
+            <p>Możesz się teraz zalogować nowym hasłem.</p>
           </div>
-          <p class="auth-footer">
-            <router-link to="/login">Wróć do logowania</router-link>
-          </p>
+          <button class="btn btn-primary auth-submit" @click="router.push({ name: 'login' })">
+            Przejdź do logowania
+          </button>
         </template>
         <template v-else>
           <div class="auth-header">
             <img src="/noteez-logo-tealtext.png" alt="NoteEz" class="auth-icon" />
-            <h1>Utwórz konto</h1>
-            <p>Dołącz do NoteEz</p>
+            <h1>Ustaw nowe hasło</h1>
           </div>
 
           <form @submit.prevent="handleSubmit" class="auth-form">
             <div class="field">
-              <label for="username">Nazwa użytkownika</label>
-              <input
-                id="username"
-                v-model="username"
-                type="text"
-                class="input-field"
-                autocomplete="username"
-                minlength="3"
-                maxlength="32"
-                pattern="[a-zA-Z0-9_.\-]+"
-                required
-              />
-            </div>
-            <div class="field">
-              <label for="email">Adres e-mail</label>
-              <input
-                id="email"
-                v-model="email"
-                type="email"
-                class="input-field"
-                autocomplete="email"
-                maxlength="256"
-                required
-              />
-            </div>
-            <div class="field">
-              <label for="password">Hasło</label>
+              <label for="password">Nowe hasło</label>
               <input
                 id="password"
                 v-model="password"
@@ -121,7 +77,7 @@ async function handleSubmit() {
               />
             </div>
             <div class="field">
-              <label for="confirm">Potwierdź hasło</label>
+              <label for="confirm">Potwierdź nowe hasło</label>
               <input
                 id="confirm"
                 v-model="confirmPassword"
@@ -135,14 +91,9 @@ async function handleSubmit() {
             </div>
             <p v-if="error" class="error-msg">{{ error }}</p>
             <button type="submit" class="btn btn-primary auth-submit" :disabled="loading">
-              {{ loading ? 'Rejestracja…' : 'Zarejestruj się' }}
+              {{ loading ? 'Zapisywanie…' : 'Ustaw nowe hasło' }}
             </button>
           </form>
-
-          <p class="auth-footer">
-            Masz już konto?
-            <router-link to="/login">Zaloguj się</router-link>
-          </p>
         </template>
       </div>
     </div>
@@ -157,15 +108,6 @@ async function handleSubmit() {
   justify-content: center;
   min-height: calc(100dvh - 2.5rem);
   padding: 1rem 0;
-}
-
-.back-link {
-  position: absolute;
-  top: 1rem;
-  left: 1rem;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--color-secondary);
 }
 
 .auth-card {
@@ -216,12 +158,5 @@ async function handleSubmit() {
   width: 100%;
   margin-top: 0.5rem;
   padding: 0.875rem;
-}
-
-.auth-footer {
-  text-align: center;
-  margin-top: 1.5rem;
-  font-size: 0.9375rem;
-  color: var(--color-text-muted);
 }
 </style>

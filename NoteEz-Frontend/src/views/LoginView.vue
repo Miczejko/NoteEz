@@ -1,16 +1,40 @@
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import AppLayout from '../components/AppLayout.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 
 const username = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
+
+const info = ref(
+  route.query.verified === '1'
+    ? 'Konto zostało potwierdzone. Możesz się teraz zalogować.'
+    : route.query.verified === '0'
+      ? 'Link weryfikacyjny jest nieprawidłowy lub wygasł.'
+      : '',
+)
+
+const showForgotPassword = ref(false)
+const forgotEmail = ref('')
+const forgotLoading = ref(false)
+const forgotSent = ref(false)
+
+async function handleForgotPassword() {
+  forgotLoading.value = true
+  try {
+    await auth.forgotPassword(forgotEmail.value)
+    forgotSent.value = true
+  } finally {
+    forgotLoading.value = false
+  }
+}
 
 async function handleSubmit() {
   error.value = ''
@@ -36,7 +60,8 @@ async function handleSubmit() {
           <p>Zaloguj się do swoich notatek</p>
         </div>
 
-        <form @submit.prevent="handleSubmit" class="auth-form">
+        <form v-if="!showForgotPassword" @submit.prevent="handleSubmit" class="auth-form">
+          <p v-if="info" class="info-msg">{{ info }}</p>
           <div class="field">
             <label for="username">Nazwa użytkownika</label>
             <input
@@ -65,7 +90,57 @@ async function handleSubmit() {
           <button type="submit" class="btn btn-primary auth-submit" :disabled="loading">
             {{ loading ? 'Logowanie…' : 'Zaloguj się' }}
           </button>
+          <button
+            type="button"
+            class="btn btn-ghost auth-submit"
+            @click="showForgotPassword = true"
+          >
+            Nie pamiętam hasła
+          </button>
         </form>
+
+        <div v-else class="auth-form">
+          <template v-if="!forgotSent">
+            <div class="field">
+              <label for="forgot-email">Adres e-mail</label>
+              <input
+                id="forgot-email"
+                v-model="forgotEmail"
+                type="email"
+                class="input-field"
+                autocomplete="email"
+                required
+              />
+            </div>
+            <button
+              type="button"
+              class="btn btn-primary auth-submit"
+              :disabled="forgotLoading"
+              @click="handleForgotPassword"
+            >
+              {{ forgotLoading ? 'Wysyłanie…' : 'Wyślij link do zmiany hasła' }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-ghost auth-submit"
+              @click="showForgotPassword = false"
+            >
+              Wróć do logowania
+            </button>
+          </template>
+          <template v-else>
+            <p class="info-msg">
+              Jeśli konto z tym adresem e-mail istnieje, wysłaliśmy na nie link do zmiany hasła.
+            </p>
+            <button
+              type="button"
+              class="btn btn-primary auth-submit"
+              @click="showForgotPassword = false"
+            >
+              Wróć do logowania
+            </button>
+          </template>
+        </div>
 
         <p class="auth-footer">
           Nie masz konta?

@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using NoteEz_Server.Data;
 using NoteEz_Server.Models;
+using NoteEz_Server.Services;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -20,11 +21,13 @@ namespace NoteEz_Server.Controllers
     {
         private readonly AppDbContext _db;
         private readonly IConfiguration _config;
+        private readonly EmailService _emailService;
 
-        public AuthController(AppDbContext db, IConfiguration config)
+        public AuthController(AppDbContext db, IConfiguration config, EmailService emailService)
         {
             _db = db;
             _config = config;
+            _emailService = emailService;
         }
 
         [HttpPost("register")]
@@ -33,14 +36,152 @@ namespace NoteEz_Server.Controllers
             if (await _db.Users.AnyAsync(u => u.Username == dto.Username))
                 return Conflict("Użytkownik już istnieje.");
 
-            var user = new User
+            if (await _db.Users.AnyAsync(u => u.Email == dto.Email))
+                return Conflict("Konto z tym adresem e-mail już istnieje.");
+
+            // Konto jeszcze nie istnieje - dane czekaja na potwierdzenie e-maila.
+            // Usuwamy ewentualne wczesniejsze, niedokonczone proby rejestracji tej samej
+            // nazwy/e-maila, zeby uzytkownik mogl po prostu sprobowac ponownie.
+            var existingPending = await _db.PendingRegistrations
+                .Where(p => p.Username == dto.Username || p.Email == dto.Email)
+                .ToListAsync();
+            _db.PendingRegistrations.RemoveRange(existingPending);
+
+            var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+                .Replace('+', '-').Replace('/', '_').TrimEnd('=');
+            var tokenHash = Sha256(rawToken);
+
+            _db.PendingRegistrations.Add(new PendingRegistration
             {
+                Id = Guid.NewGuid(),
                 Username = dto.Username,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password)
-            };
-            _db.Users.Add(user);
+                Email = dto.Email,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
+                TokenHash = tokenHash,
+                ExpiresAt = DateTime.UtcNow.AddHours(24)
+            });
+            await _db.SaveChangesAsync();
+
+            var backendBaseUrl = $"{Request.Scheme}://{Request.Host}";
+            var verificationLink = $"{backendBaseUrl}/api/auth/verify-email?token={rawToken}";
+            await _emailService.SendVerificationEmailAsync(dto.Email, verificationLink);
+
+            return Ok();
+        }
+
+        [HttpGet("verify-email")]
+        [AllowAnonymous]
+        public async Task<IActionResult> VerifyEmail([FromQuery] string token)
+        {
+            var frontendBaseUrl = _config["App:FrontendBaseUrl"]?.TrimEnd('/') ?? "";
+
+            if (string.IsNullOrEmpty(token))
+                return Redirect($"{frontendBaseUrl}/login?verified=0");
+
+            var tokenHash = Sha256(token);
+            var pending = await _db.PendingRegistrations.FirstOrDefaultAsync(p => p.TokenHash == tokenHash);
+
+            if (pending is null || pending.ExpiresAt <= DateTime.UtcNow)
+                return Redirect($"{frontendBaseUrl}/login?verified=0");
+
+            // ktos mogl w miedzyczasie zajac nazwe/e-mail przy innej rejestracji
+            if (await _db.Users.AnyAsync(u => u.Username == pending.Username || u.Email == pending.Email))
+            {
+                _db.PendingRegistrations.Remove(pending);
+                await _db.SaveChangesAsync();
+                return Redirect($"{frontendBaseUrl}/login?verified=0");
+            }
+
+            _db.Users.Add(new User
+            {
+                Username = pending.Username,
+                Email = pending.Email,
+                PasswordHash = pending.PasswordHash
+            });
+            _db.PendingRegistrations.Remove(pending);
+            await _db.SaveChangesAsync();
+
+            return Redirect($"{frontendBaseUrl}/login?verified=1");
+        }
+
+        [HttpPost("password/forgot")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ForgotPassword(ForgotPasswordDto dto)
+        {
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+            // Zawsze zwracamy 200 niezaleznie od tego, czy e-mail istnieje w bazie -
+            // inaczej formularz zdradzalby, ktore adresy sa zarejestrowane (enumeration).
+            if (user != null)
+                await IssuePasswordResetTokenAsync(user);
+
+            return Ok();
+        }
+
+        [HttpPost("password/change-request")]
+        [Authorize]
+        public async Task<IActionResult> RequestPasswordChange()
+        {
+            var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+            var user = await _db.Users.FindAsync(userId);
+            if (user is null) return Unauthorized();
+
+            await IssuePasswordResetTokenAsync(user);
+            return Ok();
+        }
+
+        [HttpPost("password/reset")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ResetPassword(ResetPasswordDto dto)
+        {
+            var tokenHash = Sha256(dto.Token);
+            var stored = await _db.PasswordResetTokens.FirstOrDefaultAsync(t => t.TokenHash == tokenHash);
+
+            if (stored is null || stored.ExpiresAt <= DateTime.UtcNow)
+                return BadRequest("Link do zmiany hasła jest nieprawidłowy lub wygasł.");
+
+            var user = await _db.Users.FindAsync(stored.UserId);
+            if (user is null)
+            {
+                _db.PasswordResetTokens.Remove(stored);
+                await _db.SaveChangesAsync();
+                return BadRequest("Link do zmiany hasła jest nieprawidłowy lub wygasł.");
+            }
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            _db.PasswordResetTokens.Remove(stored);
+
+            // zmiana hasla uniewaznia wszystkie aktywne sesje - wymuszamy ponowne logowanie wszedzie
+            var activeSessions = await _db.RefreshTokens
+                .Where(t => t.UserId == user.Id && t.RevokedAt == null)
+                .ToListAsync();
+            foreach (var s in activeSessions) s.RevokedAt = DateTime.UtcNow;
+
             await _db.SaveChangesAsync();
             return Ok();
+        }
+
+        private async Task IssuePasswordResetTokenAsync(User user)
+        {
+            var existingTokens = await _db.PasswordResetTokens
+                .Where(t => t.UserId == user.Id)
+                .ToListAsync();
+            _db.PasswordResetTokens.RemoveRange(existingTokens);
+
+            var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+                .Replace('+', '-').Replace('/', '_').TrimEnd('=');
+
+            _db.PasswordResetTokens.Add(new PasswordResetToken
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                TokenHash = Sha256(rawToken),
+                ExpiresAt = DateTime.UtcNow.AddHours(1)
+            });
+            await _db.SaveChangesAsync();
+
+            var frontendBaseUrl = _config["App:FrontendBaseUrl"]?.TrimEnd('/') ?? "";
+            var resetLink = $"{frontendBaseUrl}/reset-password?token={rawToken}";
+            await _emailService.SendPasswordResetEmailAsync(user.Email, resetLink);
         }
 
         // hash "placebo" uzywany, gdy uzytkownik nie istnieje - BCrypt.Verify zajmuje wtedy
