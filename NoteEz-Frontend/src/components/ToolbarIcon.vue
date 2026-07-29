@@ -97,6 +97,31 @@ defineProps({
     <template v-else-if="name === 'arrow-left'">
       <path d="M12.5 4.5 6 10l6.5 5.5" />
     </template>
+    <template v-else-if="name === 'calendar'">
+      <rect x="3.5" y="4.5" width="13" height="12" rx="1.8" />
+      <path d="M3.5 8.3h13M7 3v2.6M13 3v2.6" />
+    </template>
+    <template v-else-if="name === 'chevron-left'">
+      <path d="M12 5 7 10l5 5" />
+    </template>
+    <template v-else-if="name === 'chevron-right'">
+      <path d="M8 5l5 5-5 5" />
+    </template>
+    <template v-else-if="name === 'grid'">
+      <rect x="3.5" y="3.5" width="5.5" height="5.5" rx="1" />
+      <rect x="11" y="3.5" width="5.5" height="5.5" rx="1" />
+      <rect x="3.5" y="11" width="5.5" height="5.5" rx="1" />
+      <rect x="11" y="11" width="5.5" height="5.5" rx="1" />
+    </template>
+    <template v-else-if="name === 'list'">
+      <path d="M4 5.5h12M4 10h12M4 14.5h12" />
+    </template>
+    <template v-else-if="name === 'plus'">
+      <path d="M10 4v12M4 10h12" />
+    </template>
+    <template v-else-if="name === 'close'">
+      <path d="M5 5l10 10M15 5 5 15" />
+    </template>
   </svg>
 </template>
 

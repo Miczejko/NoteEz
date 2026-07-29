@@ -38,6 +38,7 @@ async function handleCreate() {
       <div class="page-header">
         <h1>Moje notatki</h1>
         <div class="page-header-actions">
+          <router-link to="/calendar" class="btn btn-outline"><ToolbarIcon name="calendar" /> Kalendarz</router-link>
           <router-link to="/devices" class="btn btn-outline"><ToolbarIcon name="device" /> Urządzenia</router-link>
           <button class="btn btn-primary" @click="showCreate = !showCreate">
             {{ showCreate ? 'Anuluj' : '+ Nowa notatka' }}

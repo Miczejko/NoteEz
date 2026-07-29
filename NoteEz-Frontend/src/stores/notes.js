@@ -47,9 +47,9 @@ export const useNotesStore = defineStore('notes', () => {
     }
   }
 
-  async function create(title, textContent = null) {
-    const { data } = await api.post('/notes', { title, textContent })
-    notes.value.unshift(data)
+  async function create(title, textContent = null, scheduledDate = null, color = null) {
+    const { data } = await api.post('/notes', { title, textContent, scheduledDate, color })
+    if (!scheduledDate) notes.value.unshift(data)
     return data
   }
 
