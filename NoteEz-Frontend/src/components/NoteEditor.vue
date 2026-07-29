@@ -233,10 +233,51 @@ onBeforeUnmount(() => {
 .editor-content :deep(.ProseMirror ul[data-type='taskList'] li > label) {
   margin-top: 0.25rem;
   user-select: none;
+  display: inline-flex;
 }
 
 .editor-content :deep(.ProseMirror ul[data-type='taskList'] li > div) {
   flex: 1;
+}
+
+.editor-content :deep(.ProseMirror ul[data-type='taskList'] li > label input[type='checkbox']) {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  border: 2px solid var(--color-border);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.editor-content :deep(.ProseMirror ul[data-type='taskList'] li > label input[type='checkbox']:hover) {
+  border-color: var(--color-secondary);
+}
+
+.editor-content :deep(.ProseMirror ul[data-type='taskList'] li > label input[type='checkbox']:checked) {
+  background: var(--color-secondary);
+  border-color: var(--color-secondary);
+}
+
+.editor-content :deep(.ProseMirror ul[data-type='taskList'] li > label input[type='checkbox']:checked::after) {
+  content: '';
+  position: absolute;
+  left: 0.35rem;
+  top: 0.1rem;
+  width: 0.3rem;
+  height: 0.6rem;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.editor-content :deep(.ProseMirror ul[data-type='taskList'] li[data-checked='true'] > div) {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
 }
 
 .editor-content :deep(.ProseMirror blockquote) {
