@@ -231,7 +231,12 @@ namespace NoteEz_Server.Controllers
             {
                 HttpOnly = true,
                 Secure = true,
-                SameSite = SameSiteMode.Strict,
+                // Frontend (noteez.online) and backend (azurewebsites.net) are different
+                // registrable domains, so this is a cross-site request from the browser's
+                // point of view - SameSite=Strict/Lax cookies are never sent on those,
+                // regardless of CORS/withCredentials. None (paired with Secure, required)
+                // is what actually lets the cookie reach /auth/refresh in production.
+                SameSite = SameSiteMode.None,
                 Expires = DateTimeOffset.UtcNow.AddDays(7)
             });
 
@@ -286,7 +291,12 @@ namespace NoteEz_Server.Controllers
             {
                 HttpOnly = true,
                 Secure = true,
-                SameSite = SameSiteMode.Strict,
+                // Frontend (noteez.online) and backend (azurewebsites.net) are different
+                // registrable domains, so this is a cross-site request from the browser's
+                // point of view - SameSite=Strict/Lax cookies are never sent on those,
+                // regardless of CORS/withCredentials. None (paired with Secure, required)
+                // is what actually lets the cookie reach /auth/refresh in production.
+                SameSite = SameSiteMode.None,
                 Expires = DateTimeOffset.UtcNow.AddDays(7)
             });
 
