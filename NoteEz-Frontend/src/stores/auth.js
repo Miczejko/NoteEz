@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import api from '../api/client'
+import { useNotesStore } from './notes'
+import { useCalendarNotesStore } from './calendarNotes'
+import { useDevicesStore } from './devices'
 
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref(localStorage.getItem('accessToken') || null)
@@ -20,6 +23,13 @@ export const useAuthStore = defineStore('auth', () => {
     username.value = null
     localStorage.removeItem('accessToken')
     localStorage.removeItem('username')
+
+    // Bez tego dane poprzedniego uzytkownika zostalyby w pamieci SPA (Pinia store
+    // przezywa nawigacje) i byłyby widoczne, gdyby ktos inny zalogowal sie w tej
+    // samej karcie bez pelnego przeladowania strony.
+    useNotesStore().$reset()
+    useCalendarNotesStore().$reset()
+    useDevicesStore().$reset()
   }
 
   async function register(user, email, password, turnstileToken) {

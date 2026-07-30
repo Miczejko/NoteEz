@@ -29,6 +29,13 @@ namespace NoteEz_Server.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll() => Ok(await _notes.GetAllAsync(UserId));
 
+        [HttpGet("calendar")]
+        public async Task<IActionResult> GetByMonth([FromQuery] int year, [FromQuery] int month)
+        {
+            if (month < 1 || month > 12) return BadRequest(new { error = "Nieprawidłowy miesiąc." });
+            return Ok(await _notes.GetByMonthAsync(UserId, year, month));
+        }
+
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(Guid id)
         {

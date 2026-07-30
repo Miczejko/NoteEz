@@ -47,9 +47,9 @@ export const useNotesStore = defineStore('notes', () => {
     }
   }
 
-  async function create(title, textContent = null) {
-    const { data } = await api.post('/notes', { title, textContent })
-    notes.value.unshift(data)
+  async function create(title, textContent = null, scheduledDate = null, color = null) {
+    const { data } = await api.post('/notes', { title, textContent, scheduledDate, color })
+    if (!scheduledDate) notes.value.unshift(data)
     return data
   }
 
@@ -126,6 +126,15 @@ export const useNotesStore = defineStore('notes', () => {
     }
   }
 
+  // Wolane przy wylogowaniu, zeby dane poprzedniego uzytkownika nie zostaly w pamieci
+  // SPA (np. na wspoldzielonym komputerze, gdzie kolejna osoba loguje sie bez przeladowania strony).
+  function $reset() {
+    notes.value = []
+    currentNote.value = null
+    loading.value = false
+    error.value = null
+  }
+
   return {
     notes,
     currentNote,
@@ -141,5 +150,6 @@ export const useNotesStore = defineStore('notes', () => {
     deleteDrawing,
     uploadAudio,
     deleteAudio,
+    $reset,
   }
 })
