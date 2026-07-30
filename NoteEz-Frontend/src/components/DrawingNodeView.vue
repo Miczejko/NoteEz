@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { nodeViewProps, NodeViewWrapper } from '@tiptap/vue-3'
 import DrawingCanvas from './DrawingCanvas.vue'
 import ToolbarIcon from './ToolbarIcon.vue'
@@ -51,6 +51,17 @@ async function handleDelete() {
 function handleEdit() {
   editing.value = true
 }
+
+// Dismiss the on-screen keyboard when entering drawing mode - otherwise it stays open
+// (focus was on the title input or the editor's contenteditable text) and covers half
+// the screen, and there's little empty space left to tap to close it manually.
+watch(
+  editing,
+  (isEditing) => {
+    if (isEditing) document.activeElement?.blur?.()
+  },
+  { immediate: true }
+)
 </script>
 
 <template>

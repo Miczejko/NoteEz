@@ -27,6 +27,7 @@ namespace NoteEz_Server.Services
                 Title = req.Title,
                 TextContent = req.TextContent,
                 Color = req.Color,
+                ScheduledDate = req.ScheduledDate,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -39,7 +40,7 @@ namespace NoteEz_Server.Services
         public async Task<List<NoteDto>> GetAllAsync(Guid userId)
         {
             var notes = await _db.Notes
-                .Where(n => n.UserId == userId)
+                .Where(n => n.UserId == userId && n.ScheduledDate == null)
                 .Include(n => n.Drawings)
                 .Include(n => n.AudioClips)
                 .OrderByDescending(n => n.UpdatedAt)
@@ -48,10 +49,22 @@ namespace NoteEz_Server.Services
             return notes.Select(ToDto).ToList();
         }
 
+        public async Task<List<CalendarNoteDto>> GetByMonthAsync(Guid userId, int year, int month)
+        {
+            return await _db.Notes
+                .Where(n => n.UserId == userId
+                    && n.ScheduledDate != null
+                    && n.ScheduledDate.Value.Year == year
+                    && n.ScheduledDate.Value.Month == month)
+                .OrderBy(n => n.ScheduledDate)
+                .Select(n => new CalendarNoteDto(n.Id, n.Title, n.TextContent, n.Color, n.ScheduledDate!.Value))
+                .ToListAsync();
+        }
+
         public async Task<List<NoteLiteDto>> GetAllLiteAsync(Guid userId)
         {
             return await _db.Notes
-                .Where(n => n.UserId == userId)
+                .Where(n => n.UserId == userId && n.ScheduledDate == null)
                 .OrderByDescending(n => n.UpdatedAt)
                 .Select(n => new NoteLiteDto(
                     n.Id,
@@ -80,6 +93,7 @@ namespace NoteEz_Server.Services
             if (req.Title is not null) note.Title = string.IsNullOrWhiteSpace(req.Title) ? "Bez tytułu" : req.Title;
             if (req.TextContent is not null) note.TextContent = req.TextContent;
             if (req.Color is not null) note.Color = req.Color.Length == 0 ? null : req.Color;
+            if (req.ScheduledDate.HasValue) note.ScheduledDate = req.ScheduledDate;
             note.UpdatedAt = DateTime.UtcNow;
 
             await _db.SaveChangesAsync();
@@ -156,6 +170,7 @@ namespace NoteEz_Server.Services
             n.Title,
             n.TextContent,
             n.Color,
+            n.ScheduledDate,
             n.UpdatedAt,
             n.Drawings.OrderBy(d => d.SortOrder).Select(d => new NoteDrawingDto(d.Id, d.StrokesJson, d.SortOrder)).ToList(),
             n.AudioClips.OrderBy(a => a.SortOrder).Select(a => new NoteAudioDto(a.Id, a.BlobUrl, a.DurationSeconds, a.SortOrder)).ToList()

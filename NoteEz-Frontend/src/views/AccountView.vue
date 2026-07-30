@@ -46,6 +46,7 @@ async function handleChangePassword() {
         </p>
 
         <div class="actions">
+          <router-link to="/devices" class="btn btn-outline"><ToolbarIcon name="device" /> Urządzenia</router-link>
           <button
             class="btn btn-secondary"
             :disabled="loading"
