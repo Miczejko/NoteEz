@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNotesStore } from '../stores/notes'
+import { useCalendarNotesStore } from '../stores/calendarNotes'
 import AppLayout from '../components/AppLayout.vue'
 import AudioRecorder from '../components/AudioRecorder.vue'
 import AudioPlayer from '../components/AudioPlayer.vue'
@@ -10,6 +11,7 @@ import NoteEditor from '../components/NoteEditor.vue'
 const route = useRoute()
 const router = useRouter()
 const notesStore = useNotesStore()
+const calendarStore = useCalendarNotesStore()
 
 const title = ref('')
 const textContent = ref('')
@@ -20,6 +22,13 @@ const activeTab = ref('text')
 const noteColors = ['#8963ba', '#d64545', '#e08a2c', '#e0c93c', '#3aa0a0', '#3468c0', '#90c290']
 
 const note = computed(() => notesStore.currentNote)
+const backTarget = computed(() => (note.value?.scheduledDate ? { name: 'calendar' } : { name: 'notes' }))
+
+function invalidateCalendarMonthFor(scheduledDate) {
+  if (!scheduledDate) return
+  const [year, month] = scheduledDate.split('-').map(Number)
+  calendarStore.invalidateMonth(year, month)
+}
 
 onMounted(async () => {
   await notesStore.fetchById(route.params.id)
@@ -67,6 +76,7 @@ async function saveNote() {
       textContent: textContent.value,
       color: color.value || '',
     })
+    invalidateCalendarMonthFor(note.value.scheduledDate)
   } finally {
     saving.value = false
   }
@@ -74,8 +84,10 @@ async function saveNote() {
 
 async function handleDelete() {
   if (!confirm('Czy na pewno chcesz usunąć tę notatkę?')) return
+  const scheduledDate = note.value.scheduledDate
   await notesStore.remove(note.value.id)
-  router.push({ name: 'notes' })
+  invalidateCalendarMonthFor(scheduledDate)
+  router.push(scheduledDate ? { name: 'calendar' } : { name: 'notes' })
 }
 
 async function handleRecorded({ blob, durationSeconds }) {
@@ -95,7 +107,7 @@ async function handleDeleteAudio(audioId) {
     <div v-else-if="!note" class="state-msg error-msg">Notatka nie znaleziona</div>
     <div v-else class="note-detail">
       <div class="detail-header">
-        <router-link :to="{ name: 'notes' }" class="back-link">← Wróć</router-link>
+        <router-link :to="backTarget" class="back-link">← Wróć</router-link>
         <div class="header-actions">
           <span v-if="saving" class="save-indicator">Zapisywanie…</span>
           <button class="btn btn-danger btn-sm" @click="handleDelete">Usuń</button>

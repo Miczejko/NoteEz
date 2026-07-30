@@ -140,6 +140,23 @@ namespace NoteEz_Server.Tests.Unit
         }
 
         [Fact]
+        public async Task GetAllLiteAsync_ExcludesScheduledNotes()
+        {
+            await using var db = NewDb();
+            var service = NewNoteService(db);
+            var owner = Guid.NewGuid();
+            var date = new DateOnly(2026, 7, 29);
+
+            await service.CreateAsync(owner, new CreateNoteRequest("Zwykla", null, null, null));
+            await service.CreateAsync(owner, new CreateNoteRequest("Kalendarzowa", null, null, date));
+
+            var notes = await service.GetAllLiteAsync(owner);
+
+            Assert.Single(notes);
+            Assert.Equal("Zwykla", notes[0].Title);
+        }
+
+        [Fact]
         public async Task GetByMonthAsync_ReturnsOnlyNotesForThatMonth()
         {
             await using var db = NewDb();

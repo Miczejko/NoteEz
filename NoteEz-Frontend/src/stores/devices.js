@@ -46,6 +46,13 @@ export const useDevicesStore = defineStore('devices', () => {
     }
   }
 
+  function $reset() {
+    devices.value = []
+    pairing.value = null
+    loading.value = false
+    error.value = null
+  }
+
   return {
     devices,
     pairing,
@@ -55,5 +62,6 @@ export const useDevicesStore = defineStore('devices', () => {
     startPairing,
     clearPairing,
     revoke,
+    $reset,
   }
 })

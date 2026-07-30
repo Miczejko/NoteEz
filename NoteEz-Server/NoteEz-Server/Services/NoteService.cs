@@ -64,7 +64,7 @@ namespace NoteEz_Server.Services
         public async Task<List<NoteLiteDto>> GetAllLiteAsync(Guid userId)
         {
             return await _db.Notes
-                .Where(n => n.UserId == userId)
+                .Where(n => n.UserId == userId && n.ScheduledDate == null)
                 .OrderByDescending(n => n.UpdatedAt)
                 .Select(n => new NoteLiteDto(
                     n.Id,

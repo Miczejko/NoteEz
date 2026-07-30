@@ -35,11 +35,21 @@ export const useCalendarNotesStore = defineStore('calendarNotes', () => {
     notesByMonth.value = rest
   }
 
+  // Wolane przy wylogowaniu - bez tego cache miesiecy zostalby w pamieci SPA i kolejny
+  // uzytkownik logujacy sie w tej samej karcie (bez przeladowania) zobaczylby przez chwile
+  // notatki poprzedniej osoby, bo fetchMonth() pomija fetch gdy miesiac jest juz w cache.
+  function $reset() {
+    notesByMonth.value = {}
+    loading.value = false
+    error.value = null
+  }
+
   return {
     notesByMonth,
     loading,
     error,
     fetchMonth,
     invalidateMonth,
+    $reset,
   }
 })
