@@ -99,6 +99,7 @@ const auth = useAuthStore()
 
 .main {
   flex: 1;
+  min-width: 0;
   padding: 1.25rem;
   max-width: 960px;
   width: 100%;

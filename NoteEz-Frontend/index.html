@@ -6,7 +6,11 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/noteez-logo-square-tealbg.png" />
     <link rel="apple-touch-icon" href="/noteez-logo-square-tealbg.png" />
     <link rel="manifest" href="/manifest.json" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <!-- interactive-widget=resizes-content: on-screen keyboard shrinks the layout viewport
+         instead of overlaying it - without this, position:sticky/fixed elements (toolbar,
+         header) miscompute their position against the pre-keyboard viewport height and can
+         end up scrolled out of view while the keyboard is open. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#000501" />
     <title>NoteEz</title>
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>

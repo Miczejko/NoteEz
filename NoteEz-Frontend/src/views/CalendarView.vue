@@ -75,8 +75,15 @@ const notesByDate = computed(() => {
 
 const selectedNotes = computed(() => (selectedDate.value ? notesByDate.value[selectedDate.value] || [] : []))
 
+// Tile view is a single column on every device now (grid glitched with uneven
+// row heights) - only in-month days are rendered, no empty leading/trailing cells.
+const monthCells = computed(() => gridCells.value.filter((c) => c.inMonth))
+
+const PREVIEW_MAX_CHARS = 60
+
 function previewOf(note) {
-  return tiptapToPlainText(note.textContent)
+  const text = tiptapToPlainText(note.textContent).replace(/\s+/g, ' ').trim()
+  return text.length > PREVIEW_MAX_CHARS ? `${text.slice(0, PREVIEW_MAX_CHARS)}…` : text
 }
 
 function load() {
@@ -173,7 +180,7 @@ onMounted(load)
       <div v-if="calendarStore.loading" class="state-msg">Ładowanie…</div>
       <div v-else-if="calendarStore.error" class="state-msg error-msg">{{ calendarStore.error }}</div>
 
-      <div v-else class="weekday-row">
+      <div v-else-if="!zoomed" class="weekday-row">
         <span v-for="wd in WEEKDAY_LABELS" :key="wd" class="weekday">{{ wd }}</span>
       </div>
 
@@ -204,48 +211,46 @@ onMounted(load)
         </button>
       </div>
 
-      <!-- Tile view: bigger cells with inline previews -->
+      <!-- Tile view: one day per row on every device, with inline note previews -->
       <div v-else class="tile-grid">
         <div
-          v-for="cell in gridCells"
+          v-for="cell in monthCells"
           :key="cell.dateStr"
           class="day-tile"
-          :class="{ 'not-in-month': !cell.inMonth, today: cell.isToday }"
+          :class="{ today: cell.isToday }"
         >
-          <template v-if="cell.inMonth">
-            <div class="day-tile-header">
-              <span class="day-number">{{ cell.day }}</span>
-              <button
-                class="btn btn-ghost btn-icon tile-add"
-                aria-label="Nowa notatka"
-                title="Nowa notatka"
-                @click="startCreate(cell.dateStr)"
-              >
-                <ToolbarIcon name="plus" :size="14" />
-              </button>
-            </div>
-            <div class="day-tile-notes">
-              <button
-                v-for="note in (notesByDate[cell.dateStr] || []).slice(0, 3)"
-                :key="note.id"
-                type="button"
-                class="tile-note"
-                :style="{ borderLeftColor: note.color || 'var(--color-secondary)' }"
-                @click="goToNote(note.id)"
-              >
-                <span class="tile-note-title">{{ note.title || 'Bez tytułu' }}</span>
-                <span v-if="previewOf(note)" class="tile-note-preview">{{ previewOf(note) }}</span>
-              </button>
-              <button
-                v-if="(notesByDate[cell.dateStr] || []).length > 3"
-                type="button"
-                class="tile-more"
-                @click="openDay(cell)"
-              >
-                +{{ (notesByDate[cell.dateStr] || []).length - 3 }} więcej
-              </button>
-            </div>
-          </template>
+          <div class="day-tile-header">
+            <span class="day-number">{{ cell.day }}</span>
+            <button
+              class="btn btn-ghost btn-icon tile-add"
+              aria-label="Nowa notatka"
+              title="Nowa notatka"
+              @click="startCreate(cell.dateStr)"
+            >
+              <ToolbarIcon name="plus" :size="14" />
+            </button>
+          </div>
+          <div class="day-tile-notes">
+            <button
+              v-for="note in (notesByDate[cell.dateStr] || []).slice(0, 3)"
+              :key="note.id"
+              type="button"
+              class="tile-note"
+              :style="{ borderLeftColor: note.color || 'var(--color-secondary)' }"
+              @click="goToNote(note.id)"
+            >
+              <span class="tile-note-title">{{ note.title || 'Bez tytułu' }}</span>
+              <span v-if="previewOf(note)" class="tile-note-preview">{{ previewOf(note) }}</span>
+            </button>
+            <button
+              v-if="(notesByDate[cell.dateStr] || []).length > 3"
+              type="button"
+              class="tile-more"
+              @click="openDay(cell)"
+            >
+              +{{ (notesByDate[cell.dateStr] || []).length - 3 }} więcej
+            </button>
+          </div>
         </div>
       </div>
 
@@ -452,26 +457,22 @@ onMounted(load)
   border-radius: 50%;
 }
 
-/* Tile view */
+/* Tile view - one day per row on every device (a 7-column grid glitched with
+   uneven row heights once note counts differed day to day). */
 .tile-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 0.375rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .day-tile {
-  min-height: 6.5rem;
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  padding: 0.375rem;
-  gap: 0.25rem;
-}
-
-.day-tile.not-in-month {
-  opacity: 0.2;
+  padding: 0.625rem 0.75rem;
 }
 
 .day-tile.today {
@@ -480,8 +481,11 @@ onMounted(load)
 
 .day-tile-header {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  gap: 0.25rem;
+  min-width: 2.25rem;
+  padding-top: 0.15rem;
 }
 
 .tile-add {
@@ -490,10 +494,11 @@ onMounted(load)
 }
 
 .day-tile-notes {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  overflow: hidden;
+  gap: 0.375rem;
 }
 
 .tile-note {
@@ -501,28 +506,43 @@ onMounted(load)
   background: var(--color-surface-alt);
   border-left: 3px solid var(--color-secondary);
   border-radius: 4px;
-  padding: 0.2rem 0.4rem;
+  padding: 0.4rem 0.5rem;
+  min-height: 2.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0.05rem;
+  justify-content: center;
+  gap: 0.1rem;
+  width: 100%;
   min-width: 0;
+  max-width: 100%;
+}
+
+/* text-overflow needs a block-level box to clip against - spans are inline by
+   default, which silently breaks ellipsis. They're also flex items here (direct
+   children of a flex-direction:column .tile-note), so on top of that they need
+   their own min-width:0 - flex items default to min-width:auto, which lets a
+   single long unbroken word blow out past the parent's width regardless of any
+   width/max-width rule on the parent. */
+.tile-note-title,
+.tile-note-preview {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .tile-note-title {
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--color-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .tile-note-preview {
   font-size: 0.6875rem;
   color: var(--color-text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .tile-more {
@@ -538,6 +558,7 @@ onMounted(load)
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  min-width: 0;
 }
 
 .day-panel-header {
@@ -579,6 +600,7 @@ onMounted(load)
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .day-note-item {
@@ -590,6 +612,9 @@ onMounted(load)
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .day-note-title {
@@ -597,12 +622,20 @@ onMounted(load)
   color: var(--color-text);
 }
 
+.day-note-title,
 .day-note-preview {
-  font-size: 0.8125rem;
-  color: var(--color-text-muted);
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.day-note-preview {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
 }
 
 @media (max-width: 640px) {
@@ -619,40 +652,9 @@ onMounted(load)
     font-size: 0.75rem;
   }
 
-  .day-tile {
-    min-height: 5.5rem;
-  }
-
   .tile-note-title,
   .tile-note-preview {
     font-size: 0.625rem;
-  }
-
-  /* 7 narrow tile columns don't fit on phones - collapse to one scrollable column of day-cards. */
-  .tile-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .day-tile.not-in-month {
-    display: none;
-  }
-
-  .day-tile {
-    min-height: 0;
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
-
-  .day-tile-header {
-    flex-direction: column;
-    align-items: center;
-    gap: 0.2rem;
-    min-width: 2rem;
-  }
-
-  .day-tile-notes {
-    flex: 1;
   }
 }
 </style>

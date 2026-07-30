@@ -1,5 +1,5 @@
 <script setup>
-import { watch, onBeforeUnmount } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import { TextStyle, Color } from '@tiptap/extension-text-style'
@@ -60,11 +60,57 @@ watch(
 onBeforeUnmount(() => {
   editor.value?.destroy()
 })
+
+// position:sticky (below) computes its offset against the layout viewport, but on
+// mobile, when the on-screen keyboard opens, browsers resize/pan the visual viewport
+// instead - sticky doesn't track that, so the toolbar can end up scrolled out of the
+// visible area while the keyboard is up (the meta viewport interactive-widget hint
+// isn't honored on all mobile browsers). Detect that case via the VisualViewport API
+// and switch the toolbar to position:fixed pinned to the actually-visible top edge.
+const keyboardOpen = ref(false)
+// How far the visual viewport's top edge has scrolled from the layout viewport's -
+// non-zero while the browser's own address bar is still partly shown, so pinning
+// the toolbar to a hardcoded top:0 leaves it partially hidden underneath that bar.
+const keyboardOffsetTop = ref(0)
+
+function updateKeyboardState() {
+  const vv = window.visualViewport
+  if (!vv || window.innerWidth > 640) {
+    keyboardOpen.value = false
+    keyboardOffsetTop.value = 0
+    return
+  }
+  keyboardOpen.value = window.innerHeight - vv.height > 120
+  keyboardOffsetTop.value = vv.offsetTop
+}
+
+onMounted(() => {
+  const vv = window.visualViewport
+  if (!vv) return
+  vv.addEventListener('resize', updateKeyboardState)
+  vv.addEventListener('scroll', updateKeyboardState)
+  // Address bar collapsing on normal page scroll also shifts visualViewport.offsetTop,
+  // but doesn't always fire the visualViewport's own events - window scroll catches that.
+  window.addEventListener('scroll', updateKeyboardState, { passive: true })
+})
+
+onBeforeUnmount(() => {
+  const vv = window.visualViewport
+  window.removeEventListener('scroll', updateKeyboardState)
+  if (!vv) return
+  vv.removeEventListener('resize', updateKeyboardState)
+  vv.removeEventListener('scroll', updateKeyboardState)
+})
 </script>
 
 <template>
   <div class="note-editor">
-    <div v-if="editor" class="toolbar">
+    <div
+      v-if="editor"
+      class="toolbar"
+      :class="{ 'toolbar-keyboard-fixed': keyboardOpen }"
+      :style="keyboardOpen ? { top: `${keyboardOffsetTop}px` } : null"
+    >
       <button type="button" title="Pogrubienie" :class="{ active: editor.isActive('bold') }" @click="editor.chain().focus().toggleBold().run()"><ToolbarIcon name="bold" /></button>
       <button type="button" title="Kursywa" :class="{ active: editor.isActive('italic') }" @click="editor.chain().focus().toggleItalic().run()"><ToolbarIcon name="italic" /></button>
       <button type="button" title="Przekreślenie" :class="{ active: editor.isActive('strike') }" @click="editor.chain().focus().toggleStrike().run()"><ToolbarIcon name="strike" /></button>
@@ -120,6 +166,21 @@ onBeforeUnmount(() => {
   background: var(--color-bg);
   padding: 0.5rem 0;
   border-bottom: 1px solid var(--color-border);
+}
+
+/* Mobile keyboard open (detected via VisualViewport, see script) - sticky can't
+   track the keyboard-shrunk visible area on all mobile browsers, so pin the
+   toolbar with position:fixed to the real top of the screen instead. Overlaps
+   AppLayout's header (that's fine - the header isn't useful while typing). */
+.toolbar.toolbar-keyboard-fixed {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  padding: 0.5rem 1rem;
+  border-radius: 0;
+  box-shadow: var(--shadow);
 }
 
 .toolbar button {
