@@ -231,12 +231,13 @@ namespace NoteEz_Server.Controllers
             {
                 HttpOnly = true,
                 Secure = true,
-                // Frontend (noteez.online) and backend (azurewebsites.net) are different
-                // registrable domains, so this is a cross-site request from the browser's
-                // point of view - SameSite=Strict/Lax cookies are never sent on those,
-                // regardless of CORS/withCredentials. None (paired with Secure, required)
-                // is what actually lets the cookie reach /auth/refresh in production.
-                SameSite = SameSiteMode.None,
+                // The frontend's Cloudflare Worker (src/worker.js) reverse-proxies /api/*
+                // to this Azure backend server-side, so the browser only ever talks to
+                // noteez.online - this cookie is genuinely first-party/same-site from its
+                // point of view. (SameSite=None was tried first since Azure's free tier
+                // has no custom-domain option, but modern browsers block third-party
+                // cookies outright regardless of SameSite, so that alone didn't work.)
+                SameSite = SameSiteMode.Strict,
                 Expires = DateTimeOffset.UtcNow.AddDays(7)
             });
 
@@ -291,12 +292,13 @@ namespace NoteEz_Server.Controllers
             {
                 HttpOnly = true,
                 Secure = true,
-                // Frontend (noteez.online) and backend (azurewebsites.net) are different
-                // registrable domains, so this is a cross-site request from the browser's
-                // point of view - SameSite=Strict/Lax cookies are never sent on those,
-                // regardless of CORS/withCredentials. None (paired with Secure, required)
-                // is what actually lets the cookie reach /auth/refresh in production.
-                SameSite = SameSiteMode.None,
+                // The frontend's Cloudflare Worker (src/worker.js) reverse-proxies /api/*
+                // to this Azure backend server-side, so the browser only ever talks to
+                // noteez.online - this cookie is genuinely first-party/same-site from its
+                // point of view. (SameSite=None was tried first since Azure's free tier
+                // has no custom-domain option, but modern browsers block third-party
+                // cookies outright regardless of SameSite, so that alone didn't work.)
+                SameSite = SameSiteMode.Strict,
                 Expires = DateTimeOffset.UtcNow.AddDays(7)
             });
 
