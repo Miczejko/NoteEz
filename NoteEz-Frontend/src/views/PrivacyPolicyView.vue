@@ -6,7 +6,7 @@ import AppLayout from '../components/AppLayout.vue'
   <AppLayout>
     <div class="policy card">
       <h1>Polityka prywatności</h1>
-      <p class="updated">Ostatnia aktualizacja: 28 lipca 2026 r.</p>
+      <p class="updated">Ostatnia aktualizacja: 1 sierpnia 2026 r.</p>
 
       <section>
         <h2>1. Administrator danych</h2>
@@ -50,7 +50,13 @@ import AppLayout from '../components/AppLayout.vue'
         <p>
           Dane konta i treść notatek przechowywane są przez czas istnienia konta użytkownika.
           Po usunięciu konta dane są usuwane lub anonimizowane, chyba że ich dłuższe przechowywanie
-          wynika z obowiązujących przepisów prawa.
+          wynika z obowiązujących przepisów prawa. Konto można usunąć samodzielnie w każdej chwili
+          w ustawieniach konta.
+        </p>
+        <p>
+          Adres IP oraz techniczne logi serwera przechowywane są przez okres do 90 dni od ich
+          zapisania, wyłącznie w celu wykrywania nadużyć i zapewnienia bezpieczeństwa usługi,
+          po czym są usuwane lub anonimizowane.
         </p>
       </section>
 
@@ -60,6 +66,27 @@ import AppLayout from '../components/AppLayout.vue'
           Dane mogą być powierzane podmiotom świadczącym usługi hostingowe i infrastrukturalne
           niezbędne do działania aplikacji, na podstawie umów powierzenia przetwarzania danych
           zgodnych z RODO. Dane nie są sprzedawane ani udostępniane w celach marketingowych osobom trzecim.
+        </p>
+        <p>W szczególności korzystamy z:</p>
+        <ul>
+          <li>
+            <strong>Microsoft Azure</strong> — hosting aplikacji, bazy danych i plików (nagrania,
+            rysunki),
+          </li>
+          <li>
+            <strong>Cloudflare</strong> (usługa Turnstile) — ochrona formularzy logowania i
+            rejestracji przed botami; przetwarza adres IP i dane techniczne przeglądarki,
+          </li>
+          <li>
+            <strong>Twilio SendGrid</strong> — wysyłka e-maili transakcyjnych (weryfikacja konta,
+            reset hasła).
+          </li>
+        </ul>
+        <p>
+          Cloudflare i Twilio SendGrid mogą przetwarzać dane poza Europejskim Obszarem Gospodarczym
+          (m.in. w USA). Transfer ten odbywa się na podstawie standardowych klauzul umownych (SCC)
+          zatwierdzonych przez Komisję Europejską, stanowiących odpowiednie zabezpieczenie zgodnie
+          z art. 46 RODO.
         </p>
       </section>
 
@@ -80,9 +107,15 @@ import AppLayout from '../components/AppLayout.vue'
       <section>
         <h2>7. Przechowywanie sesji i pliki cookies</h2>
         <p>
-          Aplikacja wykorzystuje mechanizm <code>localStorage</code> przeglądarki do przechowywania
-          tokenu sesji, dzięki czemu logowanie utrzymuje się między odwiedzinami. Nie wykorzystujemy
-          plików cookies do celów marketingowych ani śledzenia użytkowników w innych serwisach.
+          Token sesji przechowywany jest wyłącznie w pamięci przeglądarki (znika po zamknięciu
+          karty) oraz w pliku cookie <code>refreshToken</code> (typu httpOnly - niedostępnym dla
+          skryptów strony), dzięki czemu logowanie bezpiecznie utrzymuje się między odwiedzinami.
+          Wykorzystujemy też Cloudflare Turnstile, który może zapisywać informacje na urządzeniu w
+          celu odróżnienia użytkownika od bota. Zgodnie z art. 173 ustawy Prawo telekomunikacyjne
+          żaden z tych mechanizmów nie wymaga odrębnej zgody, ponieważ każdy z nich jest niezbędny
+          do świadczenia usługi (utrzymanie sesji) lub zapewnienia jej bezpieczeństwa (ochrona
+          przed botami i nadużyciami). Nie wykorzystujemy plików cookies ani podobnych technologii
+          do celów marketingowych ani śledzenia użytkowników w innych serwisach.
         </p>
       </section>
 

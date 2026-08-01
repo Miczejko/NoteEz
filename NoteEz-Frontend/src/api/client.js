@@ -5,10 +5,20 @@ const api = axios.create({
   withCredentials: true,
 })
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('accessToken')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+// Import dynamiczny, zeby uniknac cyklu client.js <-> stores/auth.js przy starcie
+// (auth.js importuje ten plik jako `api`).
+api.interceptors.request.use(async (config) => {
+  const isAuthRoute =
+    config.url?.includes('/auth/login') ||
+    config.url?.includes('/auth/register') ||
+    config.url?.includes('/auth/refresh')
+
+  if (!isAuthRoute) {
+    const { useAuthStore } = await import('../stores/auth')
+    const token = useAuthStore().accessToken
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
   }
   return config
 })

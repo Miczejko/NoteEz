@@ -7,6 +7,7 @@ const year = new Date().getFullYear()
     <span class="footer-copy">© {{ year }} NoteEz</span>
     <nav class="footer-links">
       <router-link to="/polityka-prywatnosci">Polityka prywatności</router-link>
+      <router-link to="/regulamin">Regulamin</router-link>
     </nav>
   </footer>
 </template>

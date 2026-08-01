@@ -6,23 +6,25 @@ import { useCalendarNotesStore } from './calendarNotes'
 import { useDevicesStore } from './devices'
 
 export const useAuthStore = defineStore('auth', () => {
-  const accessToken = ref(localStorage.getItem('accessToken') || null)
-  const username = ref(localStorage.getItem('username') || null)
+  // Token trzymany WYLACZNIE w pamieci (nie w localStorage) - localStorage jest
+  // czytelny dla kazdego skryptu na stronie, wiec token XSS-owalny w localStorage
+  // moze zostac wykradziony i uzyty poza przegladarka ofiary. Token w pamieci znika
+  // razem z zamknieciem karty/odswiezeniem strony; sesje po odswiezeniu strony
+  // odzyskujemy przez initialize() (cichy /auth/refresh na podstawie httpOnly cookie).
+  const accessToken = ref(null)
+  const username = ref(null)
+  let initPromise = null
 
   const isAuthenticated = computed(() => !!accessToken.value)
 
   function setSession(token, name) {
     accessToken.value = token
     username.value = name
-    localStorage.setItem('accessToken', token)
-    localStorage.setItem('username', name)
   }
 
   function clearSession() {
     accessToken.value = null
     username.value = null
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('username')
 
     // Bez tego dane poprzedniego uzytkownika zostalyby w pamieci SPA (Pinia store
     // przezywa nawigacje) i byłyby widoczne, gdyby ktos inny zalogowal sie w tej
@@ -32,8 +34,26 @@ export const useAuthStore = defineStore('auth', () => {
     useDevicesStore().$reset()
   }
 
-  async function register(user, email, password, turnstileToken) {
-    await api.post('/auth/register', { username: user, email, password, turnstileToken })
+  // Wolane raz przy starcie aplikacji (router guard) - probuje cicho wymienic
+  // refresh-token cookie na nowy access token, zeby uzytkownik nie musial sie
+  // logowac ponownie po kazdym odswiezeniu strony (skoro accessToken nie jest
+  // juz trzymany w localStorage). Brak/nieprawidlowe cookie to normalny stan
+  // wylogowania, nie blad.
+  function initialize() {
+    if (!initPromise) {
+      initPromise = refresh().catch(() => clearSession())
+    }
+    return initPromise
+  }
+
+  async function register(user, email, password, turnstileToken, consentAccepted) {
+    await api.post('/auth/register', {
+      username: user,
+      email,
+      password,
+      turnstileToken,
+      consentAccepted,
+    })
   }
 
   async function login(user, password, turnstileToken) {
@@ -62,6 +82,11 @@ export const useAuthStore = defineStore('auth', () => {
     clearSession()
   }
 
+  async function deleteAccount(password) {
+    await api.delete('/account', { data: { password } })
+    clearSession()
+  }
+
   // Wymienia refresh-token cookie na nowy access token. Wolane przez interceptor
   // w api/client.js po kazdym 401, zeby uzytkownik nie musial sie logowac ponownie
   // co 30 minut (tyle zyje access token).
@@ -78,7 +103,9 @@ export const useAuthStore = defineStore('auth', () => {
     register,
     login,
     logout,
+    deleteAccount,
     refresh,
+    initialize,
     forgotPassword,
     requestPasswordChange,
     resetPassword,

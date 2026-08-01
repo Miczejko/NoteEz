@@ -12,9 +12,28 @@ const loading = ref(false)
 const error = ref('')
 const info = ref('')
 
+const showDeleteConfirm = ref(false)
+const deletePassword = ref('')
+const deleteError = ref('')
+const deleteLoading = ref(false)
+
 async function handleLogout() {
   await auth.logout()
   router.push({ name: 'login' })
+}
+
+async function handleDeleteAccount() {
+  deleteError.value = ''
+  deleteLoading.value = true
+  try {
+    await auth.deleteAccount(deletePassword.value)
+    router.push({ name: 'home' })
+  } catch (e) {
+    deleteError.value =
+      e.response?.status === 400 ? 'Nieprawidłowe hasło.' : 'Nie udało się usunąć konta.'
+  } finally {
+    deleteLoading.value = false
+  }
 }
 
 async function handleChangePassword() {
@@ -59,6 +78,48 @@ async function handleChangePassword() {
 
         <p v-if="info" class="info-msg">{{ info }}</p>
         <p v-if="error" class="error-msg">{{ error }}</p>
+
+        <div class="danger-zone">
+          <h2>Usuń konto</h2>
+          <p>
+            Trwale usunie Twoje konto oraz wszystkie notatki, rysunki, nagrania i sparowane
+            urządzenia. Tej operacji nie można cofnąć. Zobacz
+            <router-link to="/polityka-prywatnosci">politykę prywatności</router-link>.
+          </p>
+
+          <button
+            v-if="!showDeleteConfirm"
+            class="btn btn-danger"
+            @click="showDeleteConfirm = true"
+          >
+            Usuń konto
+          </button>
+
+          <form v-else @submit.prevent="handleDeleteAccount" class="delete-form">
+            <label for="delete-password">Potwierdź hasłem</label>
+            <input
+              id="delete-password"
+              v-model="deletePassword"
+              type="password"
+              class="input-field"
+              autocomplete="current-password"
+              required
+            />
+            <p v-if="deleteError" class="error-msg">{{ deleteError }}</p>
+            <div class="delete-actions">
+              <button type="submit" class="btn btn-danger" :disabled="deleteLoading">
+                {{ deleteLoading ? 'Usuwanie…' : 'Potwierdź usunięcie konta' }}
+              </button>
+              <button
+                type="button"
+                class="btn btn-outline"
+                @click="showDeleteConfirm = false; deletePassword = ''; deleteError = ''"
+              >
+                Anuluj
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   </AppLayout>
@@ -105,6 +166,40 @@ async function handleChangePassword() {
 .actions {
   display: flex;
   flex-direction: column;
+  gap: 0.75rem;
+}
+
+.danger-zone {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.danger-zone h2 {
+  font-size: 1.0625rem;
+  color: var(--color-danger, #c0392b);
+  margin-bottom: 0.5rem;
+}
+
+.danger-zone p {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  margin-bottom: 1rem;
+}
+
+.delete-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.delete-form label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.delete-actions {
+  display: flex;
   gap: 0.75rem;
 }
 </style>

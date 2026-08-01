@@ -10,6 +10,9 @@ namespace NoteEz_Server.Models
         public string Username { get; set; }
         public string Email { get; set; }
         public string PasswordHash { get; set; }
+        // Znacznik czasu zapoznania sie z polityka prywatnosci/regulaminem przy rejestracji -
+        // dowod na wypadek kontroli, ze uzytkownik mial do nich dostep przed podaniem danych.
+        public DateTime? ConsentAcceptedAt { get; set; }
         public ICollection<Note> Notes { get; set; }
         public ICollection<RefreshToken> RefreshTokens { get; set; }
     }
@@ -24,6 +27,7 @@ namespace NoteEz_Server.Models
         public string PasswordHash { get; set; }
         public string TokenHash { get; set; }
         public DateTime ExpiresAt { get; set; }
+        public DateTime? ConsentAcceptedAt { get; set; }
     }
 
     // Token do zmiany hasla - zarowno dla "nie pamietam hasla" (niezalogowany, podaje e-mail),
@@ -44,7 +48,12 @@ namespace NoteEz_Server.Models
         [Required, StringLength(100, MinimumLength = 8)]
         string Password,
         [Required]
-        string TurnstileToken);
+        string TurnstileToken,
+        bool ConsentAccepted);
+
+    public record AccountDeleteDto(
+        [Required]
+        string Password);
 
     public record LoginDto(
         [Required, StringLength(32)]

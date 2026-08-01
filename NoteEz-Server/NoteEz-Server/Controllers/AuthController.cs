@@ -44,6 +44,9 @@ namespace NoteEz_Server.Controllers
             if (!await VerifyCaptchaAsync(dto.TurnstileToken))
                 return BadRequest("Weryfikacja CAPTCHA nie powiodła się. Spróbuj ponownie.");
 
+            if (!dto.ConsentAccepted)
+                return BadRequest("Musisz zapoznać się z polityką prywatności i regulaminem.");
+
             if (await _db.Users.AnyAsync(u => u.Username == dto.Username))
                 return Conflict("Użytkownik już istnieje.");
 
@@ -75,7 +78,8 @@ namespace NoteEz_Server.Controllers
                 Email = dto.Email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
                 TokenHash = tokenHash,
-                ExpiresAt = DateTime.UtcNow.AddHours(24)
+                ExpiresAt = DateTime.UtcNow.AddHours(24),
+                ConsentAcceptedAt = DateTime.UtcNow
             });
             await _db.SaveChangesAsync();
 
@@ -116,7 +120,8 @@ namespace NoteEz_Server.Controllers
             {
                 Username = pending.Username,
                 Email = pending.Email,
-                PasswordHash = pending.PasswordHash
+                PasswordHash = pending.PasswordHash,
+                ConsentAcceptedAt = pending.ConsentAcceptedAt
             });
             _db.PendingRegistrations.Remove(pending);
             await _db.SaveChangesAsync();

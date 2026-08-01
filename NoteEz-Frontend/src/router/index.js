@@ -13,6 +13,11 @@ const routes = [
     component: () => import('../views/PrivacyPolicyView.vue'),
   },
   {
+    path: '/regulamin',
+    name: 'terms-of-service',
+    component: () => import('../views/TermsOfServiceView.vue'),
+  },
+  {
     path: '/login',
     name: 'login',
     component: () => import('../views/LoginView.vue'),
@@ -66,8 +71,16 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore()
+
+  // Access token zyje tylko w pamieci (nie w localStorage), wiec po twardym
+  // odswiezeniu strony trzeba go raz odzyskac z refresh-token cookie, zanim
+  // zdecydujemy, czy uzytkownik jest zalogowany.
+  if (to.meta.requiresAuth || to.meta.guest) {
+    await auth.initialize()
+  }
+
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { name: 'login' }
   }

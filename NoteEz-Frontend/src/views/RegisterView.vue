@@ -15,6 +15,7 @@ const loading = ref(false)
 const registered = ref(false)
 const turnstileToken = ref('')
 const turnstileWidget = ref(null)
+const consentAccepted = ref(false)
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9_.-]{3,32}$/
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -41,9 +42,19 @@ async function handleSubmit() {
     error.value = 'Potwierdź, że nie jesteś botem'
     return
   }
+  if (!consentAccepted.value) {
+    error.value = 'Musisz zapoznać się z polityką prywatności i regulaminem'
+    return
+  }
   loading.value = true
   try {
-    await auth.register(username.value, email.value, password.value, turnstileToken.value)
+    await auth.register(
+      username.value,
+      email.value,
+      password.value,
+      turnstileToken.value,
+      consentAccepted.value,
+    )
     registered.value = true
   } catch (e) {
     const data = e.response?.data
@@ -142,6 +153,16 @@ async function handleSubmit() {
                 required
               />
             </div>
+            <label class="consent-field">
+              <input type="checkbox" v-model="consentAccepted" required />
+              <span>
+                Zapoznałem się z
+                <router-link to="/polityka-prywatnosci" target="_blank">polityką prywatności</router-link>
+                i
+                <router-link to="/regulamin" target="_blank">regulaminem</router-link>
+                oraz je akceptuję.
+              </span>
+            </label>
             <TurnstileWidget
               ref="turnstileWidget"
               @verified="turnstileToken = $event"
@@ -224,6 +245,20 @@ async function handleSubmit() {
   font-size: 0.875rem;
   font-weight: 600;
   margin-bottom: 0.375rem;
+}
+
+.consent-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.consent-field input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
 }
 
 .auth-submit {
