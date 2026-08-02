@@ -32,7 +32,7 @@ extern int listScrollRow; // indeks pierwszej widocznej notatki na liscie
 extern unsigned long lastActivityMillis; // czas ostatniego dotkniecia - do usypiania po bezczynnosci
 
 // ---- ekran szczegółów notatki ----
-enum Screen { SCREEN_LIST, SCREEN_DETAIL, SCREEN_DRAWING };
+enum Screen { SCREEN_LIST, SCREEN_DETAIL, SCREEN_DRAWING, SCREEN_WEATHER };
 extern Screen currentScreen;
 
 // jedna zawinieta linia tresci notatki, z minimalnym formatowaniem jakie potrafi wyswietlic ESP32

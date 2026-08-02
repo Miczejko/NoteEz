@@ -65,3 +65,38 @@
 #define DETAIL_CONTENT_TOP 40
 #define DETAIL_LINE_HEIGHT 14
 #define DETAIL_CONTENT_BOTTOM 200 // ponizej tego zaczynaja sie przyciski scrolla
+
+// ---- ekran pogody (Open-Meteo, https://open-meteo.com - bez klucza API) ----
+// Na sztywno Bialystok - docelowo do wyboru w portalu konfiguracyjnym WiFi
+#define WEATHER_LAT "53.1325"
+#define WEATHER_LON "23.1688"
+#define WEATHER_FORECAST_DAYS 4 // dzisiaj + 3 dni w przod
+#define WEATHER_HOURS_PER_DAY 24
+#define MAX_WEATHER_ENTRIES (WEATHER_FORECAST_DAYS * WEATHER_HOURS_PER_DAY)
+
+// przycisk "Pogoda" w naglowku ekranu listy notatek (miedzy tytulem a przyciskiem Reset)
+#define WEATHER_BTN_X 195
+#define WEATHER_BTN_Y 0
+#define WEATHER_BTN_W 60
+#define WEATHER_BTN_H 32
+
+// przycisk "Odswiez" na ekranie pogody (ta sama pozycja co przycisk "Rysunek" na ekranie
+// szczegolow notatki - ekrany sie nie nakladaja, wiec bezpiecznie recyklingujemy geometrie)
+#define WEATHER_REFRESH_BTN_X DRAWING_BTN_X
+#define WEATHER_REFRESH_BTN_Y DRAWING_BTN_Y
+#define WEATHER_REFRESH_BTN_W DRAWING_BTN_W
+#define WEATHER_REFRESH_BTN_H DRAWING_BTN_H
+
+// nawigacja dnia (strzalki < / > wokol etykiety "Dzis" / "Jutro" / daty)
+#define WEATHER_DAY_NAV_Y 34
+#define WEATHER_DAY_NAV_H 22
+#define WEATHER_DAY_PREV_BTN_X 4
+#define WEATHER_DAY_PREV_BTN_W 34
+#define WEATHER_DAY_NEXT_BTN_X 282
+#define WEATHER_DAY_NEXT_BTN_W 34
+
+#define WEATHER_CLIMATE_Y 62
+
+#define WEATHER_LIST_START_Y 80
+#define WEATHER_ROW_HEIGHT 18
+#define WEATHER_CONTENT_BOTTOM 200 // ponizej tego zaczynaja sie przyciski scrolla

@@ -7,6 +7,7 @@
 #include "State.h"
 #include "UiHelpers.h"
 #include "ClimateSensor.h"
+#include "WeatherScreen.h"
 
 int listRowsPerPage() {
   return (LIST_CONTENT_BOTTOM - LIST_START_Y) / LIST_ROW_HEIGHT;
@@ -37,6 +38,7 @@ void renderNotesList() {
   display.println("NOTATNIK");
 
   drawTopButtons();
+  drawWeatherButton();
   display.setTextSize(1);
 
   // TEST: odczyt SHT40 - do usuniecia/przeniesienia po sprawdzeniu, ze czujnik dziala

@@ -14,6 +14,7 @@
 #include "NoteDetailScreen.h"
 #include "DrawingScreen.h"
 #include "ClimateSensor.h"
+#include "WeatherScreen.h"
 
 void setup() {
   Serial.begin(115200);
@@ -132,6 +133,12 @@ void loop() {
     }
     resetTouchStart = 0;
 
+    if (pointInRect(x, y, WEATHER_BTN_X, WEATHER_BTN_Y, WEATHER_BTN_W, WEATHER_BTN_H)) {
+      fetchWeather();
+      delay(300); // debounce
+      return;
+    }
+
     if (millis() - lastScrollTap > 180) { // debounce przewijania, ale pozwala trzymac palec
       if (pointInRect(x, y, SCROLL_UP_BTN_X, SCROLL_BTN_Y, SCROLL_BTN_W, SCROLL_BTN_H)) {
         scrollList(-1);
@@ -174,6 +181,40 @@ void loop() {
         lastScrollTap = millis();
       } else if (pointInRect(x, y, SCROLL_DOWN_BTN_X, SCROLL_BTN_Y, SCROLL_BTN_W, SCROLL_BTN_H)) {
         scrollDetail(detailLinesPerPage() / 2 + 1);
+        lastScrollTap = millis();
+      }
+    }
+  } else if (currentScreen == SCREEN_WEATHER) {
+    if (pointInRect(x, y, BACK_BTN_X, BACK_BTN_Y, BACK_BTN_W, BACK_BTN_H)) {
+      renderNotesList();
+      delay(300); // debounce
+      return;
+    }
+
+    if (pointInRect(x, y, WEATHER_REFRESH_BTN_X, WEATHER_REFRESH_BTN_Y, WEATHER_REFRESH_BTN_W, WEATHER_REFRESH_BTN_H)) {
+      fetchWeather();
+      delay(300); // debounce
+      return;
+    }
+
+    if (pointInRect(x, y, WEATHER_DAY_PREV_BTN_X, WEATHER_DAY_NAV_Y, WEATHER_DAY_PREV_BTN_W, WEATHER_DAY_NAV_H)) {
+      changeWeatherDay(-1);
+      delay(250); // debounce
+      return;
+    }
+
+    if (pointInRect(x, y, WEATHER_DAY_NEXT_BTN_X, WEATHER_DAY_NAV_Y, WEATHER_DAY_PREV_BTN_W, WEATHER_DAY_NAV_H)) {
+      changeWeatherDay(1);
+      delay(250); // debounce
+      return;
+    }
+
+    if (millis() - lastScrollTap > 180) { // debounce przewijania, ale pozwala trzymac palec
+      if (pointInRect(x, y, SCROLL_UP_BTN_X, SCROLL_BTN_Y, SCROLL_BTN_W, SCROLL_BTN_H)) {
+        scrollWeather(-1);
+        lastScrollTap = millis();
+      } else if (pointInRect(x, y, SCROLL_DOWN_BTN_X, SCROLL_BTN_Y, SCROLL_BTN_W, SCROLL_BTN_H)) {
+        scrollWeather(1);
         lastScrollTap = millis();
       }
     }
