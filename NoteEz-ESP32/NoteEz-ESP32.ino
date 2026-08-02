@@ -945,9 +945,7 @@ void loop() {
 
   if (!touched) {
     resetTouchStart = 0;
-    if (millis() - lastActivityMillis > IDLE_SLEEP_MS) {
-      enterLightSleepTest(); // TYMCZASOWO na potrzeby testu - docelowo enterDeepSleep()
-    }
+    // usypianie wylaczone - nie dzialalo poprawnie (biale/zamarzniete ekrany po wybudzeniu)
     delay(20);
     return;
   }
