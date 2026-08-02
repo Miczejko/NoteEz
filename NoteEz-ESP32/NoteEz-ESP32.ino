@@ -13,6 +13,7 @@
 #include "NotesScreen.h"
 #include "NoteDetailScreen.h"
 #include "DrawingScreen.h"
+#include "ClimateSensor.h"
 
 void setup() {
   Serial.begin(115200);
@@ -39,6 +40,9 @@ void setup() {
   // kalibracja dotyku (jak w oryginalnym szkicu)
   uint16_t calData[8] = {3826, 308, 3886, 3793, 361, 252, 359, 3741};
   display.setTouchCalibrate(calData);
+
+  // Bitbangowane I2C (SoftI2C) - celowo bez biblioteki Wire, ktora psula dotyk na tej plytce.
+  initClimateSensor();
 
   prefs.begin("noteez", false);
   apiKey = prefs.getString("apiKey", "");

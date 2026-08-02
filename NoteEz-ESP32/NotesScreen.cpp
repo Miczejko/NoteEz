@@ -6,6 +6,7 @@
 #include "Config.h"
 #include "State.h"
 #include "UiHelpers.h"
+#include "ClimateSensor.h"
 
 int listRowsPerPage() {
   return (LIST_CONTENT_BOTTOM - LIST_START_Y) / LIST_ROW_HEIGHT;
@@ -37,6 +38,15 @@ void renderNotesList() {
 
   drawTopButtons();
   display.setTextSize(1);
+
+  // TEST: odczyt SHT40 - do usuniecia/przeniesienia po sprawdzeniu, ze czujnik dziala
+  display.setTextColor(COLOR_TEXT_MUTED);
+  display.setCursor(70, 28);
+  if (sht4Ready && !isnan(currentTempC)) {
+    display.printf("%.1f C   %.0f %%", currentTempC, currentHumidityPct);
+  } else {
+    display.print("SHT40: brak danych");
+  }
 
   if (apiKey.length() == 0) {
     display.setTextColor(COLOR_TEXT_MUTED);
@@ -95,6 +105,7 @@ void renderNotesList() {
 }
 
 void fetchNotesLite() {
+  readClimate();
   notesCount = 0;
   listScrollRow = 0;
 

@@ -14,6 +14,12 @@
 // bo tylko GO/wylaczamy je - nie budzimy sie przez niego).
 #define BACKLIGHT_PIN 10
 
+// Czujnik temperatury/wilgotnosci SHT40 (I2C bitbangowane, SoftI2C - patrz ClimateSensor.h).
+// Biblioteka Wire psula dzielona magistrale SPI dotyku/wyswietlacza (nawet nieuzywana!),
+// dlatego I2C jest tu zaimplementowane recznie na zwyklych GPIO, bez Wire.h.
+#define SHT40_SDA_PIN 11
+#define SHT40_SCL_PIN 1
+
 // domyślny host używany tylko przy pierwszej konfiguracji (potem nadpisywany przez portal WiFiManager)
 #define DEFAULT_API_HOST "192.168.100.168:8080"
 
