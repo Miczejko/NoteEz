@@ -15,6 +15,7 @@
 #include "DrawingScreen.h"
 #include "ClimateSensor.h"
 #include "WeatherScreen.h"
+#include "Buzzer.h"
 
 void setup() {
   Serial.begin(115200);
@@ -22,13 +23,24 @@ void setup() {
 
   // Diagnostyka: pokazuje czy ten start to powrot z deep sleep (i przez co), czy zwykly reset/wgranie.
   // ESP_SLEEP_WAKEUP_GPIO (touch zadzialal) / ESP_SLEEP_WAKEUP_UNDEFINED (zwykly reset/power-on).
-  Serial.printf("[boot] przyczyna wybudzenia: %d\n", (int)esp_sleep_get_wakeup_cause());
+  esp_sleep_wakeup_cause_t wakeupCause = esp_sleep_get_wakeup_cause();
+  Serial.printf("[boot] przyczyna wybudzenia: %d\n", (int)wakeupCause);
+
+  initBuzzer();
+  if (wakeupCause == ESP_SLEEP_WAKEUP_GPIO) {
+    buzzWake(); // wybudzenie dotykiem z deep sleep
+  }
 
   // Zwalnia "zatrzask" (gpio_hold) z ewentualnego poprzedniego deep sleep i wlacza
   // podswietlenie na nowo - bez tego pin zostalby zablokowany na stanie niskim z ostatniego snu.
   gpio_hold_dis((gpio_num_t)BACKLIGHT_PIN);
   pinMode(BACKLIGHT_PIN, OUTPUT);
   digitalWrite(BACKLIGHT_PIN, HIGH);
+
+  // To samo dla CS dotyku - inaczej pozostalby "zatrzasniety" na HIGH i LovyanGFX nie moglby
+  // nim sterowac (pin_cs w konfiguracji Touch_XPT2046 w Display.h musi miec pelna kontrole).
+  gpio_hold_dis((gpio_num_t)TOUCH_CS_PIN);
+
 
   // TYMCZASOWA DIAGNOSTYKA: konfigurujemy T_IRQ od razu przy starcie (nie dopiero przed
   // usnieciem), zeby test w loop() mial wiarygodny, zdefiniowany odczyt od pierwszej sekundy.
@@ -65,6 +77,7 @@ void setup() {
   bool connected = wm.autoConnect("Notatnik-ESP32");
 
   if (!connected) {
+    buzzError();
     showMessage("Brak polaczenia", "Restart za 3s...", COLOR_DANGER);
     delay(3000);
     ESP.restart();
@@ -91,6 +104,7 @@ void setup() {
   if (enteredCode.length() > 0) {
     claimDevice(enteredCode);
   } else if (apiKey.length() == 0) {
+    buzzError();
     showMessage("Brak parowania", "Uzyj portalu WiFi, by wpisac kod", COLOR_DANGER);
     delay(3000);
   }
@@ -109,7 +123,14 @@ void loop() {
 
   if (!touched) {
     resetTouchStart = 0;
-    // usypianie wylaczone - nie dzialalo poprawnie (biale/zamarzniete ekrany po wybudzeniu)
+    // Light sleep test wypadl dobrze (patrz historia w git) - docelowy tryb to deep sleep,
+    // bo oszczedza duzo wiecej energii (restartuje caly chip zamiast trzymac go w stanie
+    // wstrzymania). Po wybudzeniu kod wraca do setup() od zera - display.init() sam zajmuje
+    // sie poprawna inicjalizacja/timingiem panelu, wiec nie potrzeba tu dodatkowego delay()
+    // jak w tescie light sleep (tam byl display.wakeup(), nie pelna reinicjalizacja).
+    if (millis() - lastActivityMillis > IDLE_SLEEP_MS) {
+      enterDeepSleep();
+    }
     delay(20);
     return;
   }

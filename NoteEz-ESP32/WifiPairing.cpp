@@ -5,6 +5,7 @@
 #include "Colors.h"
 #include "State.h"
 #include "UiHelpers.h"
+#include "Buzzer.h"
 
 void configModeCallback(WiFiManager* myWiFiManager) {
   display.fillScreen(COLOR_BG);
@@ -71,6 +72,7 @@ bool claimDevice(const String& code) {
   }
 
   if (status != 200) {
+    buzzError();
     showMessage("Blad parowania", response.c_str(), COLOR_DANGER);
     Serial.printf("claim status=%d body=%s\n", status, response.c_str());
     delay(3000);
@@ -79,6 +81,7 @@ bool claimDevice(const String& code) {
 
   JsonDocument resDoc;
   if (deserializeJson(resDoc, response) != DeserializationError::Ok) {
+    buzzError();
     showMessage("Blad parowania", "Nieprawidlowa odpowiedz serwera", COLOR_DANGER);
     delay(3000);
     return false;

@@ -8,6 +8,8 @@
 #include "UiHelpers.h"
 #include "ClimateSensor.h"
 #include "WeatherScreen.h"
+#include "Buzzer.h"
+#include "Battery.h"
 
 int listRowsPerPage() {
   return (LIST_CONTENT_BOTTOM - LIST_START_Y) / LIST_ROW_HEIGHT;
@@ -41,7 +43,7 @@ void renderNotesList() {
   drawWeatherButton();
   display.setTextSize(1);
 
-  // TEST: odczyt SHT40 - do usuniecia/przeniesienia po sprawdzeniu, ze czujnik dziala
+  // TEST: odczyt SHT40 + poziom baterii - do usuniecia/przeniesienia po sprawdzeniu
   display.setTextColor(COLOR_TEXT_MUTED);
   display.setCursor(70, 28);
   if (sht4Ready && !isnan(currentTempC)) {
@@ -49,6 +51,9 @@ void renderNotesList() {
   } else {
     display.print("SHT40: brak danych");
   }
+
+  display.setCursor(70, 40);
+  display.printf("Bateria: %d %% (%.2fV)", batteryPercent, batteryVoltage);
 
   if (apiKey.length() == 0) {
     display.setTextColor(COLOR_TEXT_MUTED);
@@ -108,6 +113,7 @@ void renderNotesList() {
 
 void fetchNotesLite() {
   readClimate();
+  readBattery();
   notesCount = 0;
   listScrollRow = 0;
 
@@ -124,6 +130,7 @@ void fetchNotesLite() {
   http.end();
 
   if (status != 200) {
+    buzzError();
     Serial.printf("device-notes/lite status=%d body=%s\n", status, response.c_str());
     renderNotesList();
     display.setTextColor(COLOR_DANGER);
@@ -134,6 +141,7 @@ void fetchNotesLite() {
 
   JsonDocument doc;
   if (deserializeJson(doc, response) != DeserializationError::Ok) {
+    buzzError();
     renderNotesList();
     display.setTextColor(COLOR_DANGER);
     display.setCursor(10, 50);

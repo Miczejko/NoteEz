@@ -7,6 +7,7 @@
 #include "State.h"
 #include "UiHelpers.h"
 #include "NotesScreen.h"
+#include "Buzzer.h"
 
 std::vector<String> wrapText(const String& text, int charsPerLine) {
   std::vector<String> lines;
@@ -142,6 +143,7 @@ void selectNote(int index) {
   http.end();
 
   if (status != 200) {
+    buzzError();
     Serial.printf("device-notes/{id} status=%d body=%s\n", status, response.c_str());
     showMessage("Blad wczytywania", "Sprobuj ponownie", COLOR_DANGER);
     delay(2000);
@@ -151,11 +153,13 @@ void selectNote(int index) {
 
   detailDoc.clear();
   if (deserializeJson(detailDoc, response) != DeserializationError::Ok) {
+    buzzError();
     showMessage("Blad wczytywania", "Nieprawidlowa odpowiedz", COLOR_DANGER);
     delay(2000);
     renderNotesList();
     return;
   }
+
 
   detailTitle = String((const char*)(detailDoc["title"] | "(bez tytulu)"));
   detailHasDrawing = detailDoc["drawings"].as<JsonArray>().size() > 0;

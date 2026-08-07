@@ -8,6 +8,13 @@
 #define TIRQ_PIN 3
 #define IDLE_SLEEP_MS 60000 // 1 minuta bezczynnosci -> deep sleep
 
+// CS dotyku XPT2046 (musi sie zgadzac z cfg.pin_cs w konfiguracji Touch_XPT2046 w Display.h) -
+// trzeba go jawnie trzymac na HIGH w deep sleep, inaczej PENIRQ/T_IRQ przestaje dzialac.
+#define TOUCH_CS_PIN 21
+
+// Brzeczyk pasywny (tone()/PWM) - ostatni wolny pin na tej plytce.
+#define BUZZER_PIN 23
+
 // Podswietlenie (BLK/LED modulu) przepiete z 3.3V na GPIO10, zeby dalo sie je zgasic
 // programowo przed usypianiem. GPIO10 nie koliduje z SPI (0/2/6/7) ani ze strappingiem (4/5),
 // wiec jest bezpiecznym wyborem do zwyklego sterowania cyfrowego (nie musi byc pinem LP-IO,
@@ -17,8 +24,22 @@
 // Czujnik temperatury/wilgotnosci SHT40 (I2C bitbangowane, SoftI2C - patrz ClimateSensor.h).
 // Biblioteka Wire psula dzielona magistrale SPI dotyku/wyswietlacza (nawet nieuzywana!),
 // dlatego I2C jest tu zaimplementowane recznie na zwyklych GPIO, bez Wire.h.
+// SCL przeniesiony z GPIO1 na GPIO22 (dawny pin diody, ktora zostala usunieta), zeby zwolnic
+// GPIO1 pod pomiar baterii - to jedyny "ADC-owy" wolny pin na tej plytce (ADC1 dziala tylko
+// na GPIO0-6, a wszystkie inne z tego zakresu sa juz zajete przez SPI/dotyk/strapping).
 #define SHT40_SDA_PIN 11
-#define SHT40_SCL_PIN 1
+#define SHT40_SCL_PIN 22
+
+// Pomiar napiecia baterii przez dzielnik rezystorowy (2x rezystor, np. 100k+100k = dzielenie
+// przez 2) na GPIO1 (jedyny wolny pin z ADC1 na tej plytce). Patrz Battery.h.
+#define BATTERY_ADC_PIN 1
+// Odwrotnosc dzielnika napiecia - dla 100k+100k (dzielenie przez 2) to 2.0. Jesli dobierzesz
+// inne rezystory, przelicz: BATTERY_DIVIDER_RATIO = (R1+R2) / R2 (R2 to ten od strony GND/ADC).
+#define BATTERY_DIVIDER_RATIO 2.0f
+// Typowa krzywa rozladowania LiPo 1S - napiecia dla 0% i 100% (przyblizenie liniowe,
+// wystarczajace bez dedykowanego "fuel gauge")
+#define BATTERY_VOLTAGE_EMPTY 3.0f
+#define BATTERY_VOLTAGE_FULL  4.2f
 
 // domyślny host używany tylko przy pierwszej konfiguracji (potem nadpisywany przez portal WiFiManager)
 #define DEFAULT_API_HOST "192.168.100.168:8080"
@@ -58,7 +79,7 @@
 
 #define MAX_NOTES 20
 
-#define LIST_START_Y 44
+#define LIST_START_Y 54
 #define LIST_ROW_HEIGHT 44
 #define LIST_CONTENT_BOTTOM 200 // ponizej tego zaczynaja sie przyciski scrolla listy
 
