@@ -6,5 +6,4 @@ void initBuzzer(); // wywolac raz w setup()
 
 void buzzWake();  // krotki pik przy wybudzeniu dotykiem
 void buzzError();  // dwa krotkie piski - blad (pobieranie, parowanie, WiFi)
-
-// TODO: melodia po uplynieciu krotkiego timera - do dodania pozniej
+void buzzTimerDone();  // kilkusekundowa melodia po uplynieciu minutnika (patrz TimerScreen.h)

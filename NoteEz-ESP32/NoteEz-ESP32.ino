@@ -15,6 +15,7 @@
 #include "DrawingScreen.h"
 #include "ClimateSensor.h"
 #include "WeatherScreen.h"
+#include "TimerScreen.h"
 #include "Buzzer.h"
 
 void setup() {
@@ -66,8 +67,8 @@ void setup() {
   // --- WiFiManager: pola dodatkowe w portalu konfiguracyjnym ---
   // kod parowania wygenerowany w apce Vue (zakladka Urzadzenia -> Sparuj urzadzenie)
   pairingCodeParam = new WiFiManagerParameter("code", "Kod parowania z apki Vue", "", 8);
-  // adres backendu w sieci lokalnej, np. 192.168.1.50:8080
-  apiHostParam = new WiFiManagerParameter("host", "Adres serwera (IP:port)", apiHost.c_str(), 40);
+  // domyslnie produkcja (noteez.online, https); mozna nadpisac lokalnym adresem IP:port (http) do testow dev
+  apiHostParam = new WiFiManagerParameter("host", "Adres serwera (domena lub IP:port)", apiHost.c_str(), 40);
 
   wm.addParameter(pairingCodeParam);
   wm.addParameter(apiHostParam);
@@ -121,6 +122,10 @@ void loop() {
 
   bool touched = display.getTouch(&x, &y);
 
+  // odswieza odliczanie minutnika raz na sekunde i wykrywa jego koniec - niezaleznie od dotyku,
+  // wiec MM:SS na ekranie faktycznie leci do zera bez interakcji uzytkownika
+  timerTick();
+
   if (!touched) {
     resetTouchStart = 0;
     // Light sleep test wypadl dobrze (patrz historia w git) - docelowy tryb to deep sleep,
@@ -128,7 +133,10 @@ void loop() {
     // wstrzymania). Po wybudzeniu kod wraca do setup() od zera - display.init() sam zajmuje
     // sie poprawna inicjalizacja/timingiem panelu, wiec nie potrzeba tu dodatkowego delay()
     // jak w tescie light sleep (tam byl display.wakeup(), nie pelna reinicjalizacja).
-    if (millis() - lastActivityMillis > IDLE_SLEEP_MS) {
+    // Usypianie zablokowane, gdy minutnik aktywnie odlicza, oraz po alarmie az do kliknięcia
+    // "OK" (TIMER_DONE) - inaczej ekran zgaslby zaraz po melodii, zanim ktokolwiek go zobaczy.
+    bool timerBlocksSleep = (timerPhase == TIMER_RUNNING || timerPhase == TIMER_DONE);
+    if (millis() - lastActivityMillis > IDLE_SLEEP_MS && !timerBlocksSleep) {
       enterDeepSleep();
     }
     delay(20);
@@ -156,6 +164,16 @@ void loop() {
 
     if (pointInRect(x, y, WEATHER_BTN_X, WEATHER_BTN_Y, WEATHER_BTN_W, WEATHER_BTN_H)) {
       fetchWeather();
+      delay(300); // debounce
+      return;
+    }
+
+    if (pointInRect(x, y, TIMER_BTN_X, TIMER_BTN_Y, TIMER_BTN_W, TIMER_BTN_H)) {
+      // jesli minutnik juz odlicza/jest zapauzowany, wracamy do tego widoku zamiast resetowac
+      // go do ekranu wyboru minut
+      if (timerPhase == TIMER_RUNNING) renderTimerRunning();
+      else if (timerPhase == TIMER_PAUSED) renderTimerPaused();
+      else renderTimerSetup();
       delay(300); // debounce
       return;
     }
@@ -237,6 +255,59 @@ void loop() {
       } else if (pointInRect(x, y, SCROLL_DOWN_BTN_X, SCROLL_BTN_Y, SCROLL_BTN_W, SCROLL_BTN_H)) {
         scrollWeather(1);
         lastScrollTap = millis();
+      }
+    }
+  } else if (currentScreen == SCREEN_TIMER) {
+    if (timerPhase == TIMER_SETUP) {
+      if (pointInRect(x, y, BACK_BTN_X, BACK_BTN_Y, BACK_BTN_W, BACK_BTN_H)) {
+        renderNotesList();
+        delay(300); // debounce
+        return;
+      }
+      if (pointInRect(x, y, TIMER_SETUP_MINUS_X, TIMER_SETUP_ADJ_Y, TIMER_SETUP_ADJ_W, TIMER_SETUP_ADJ_H)) {
+        adjustTimerMinutes(-1);
+        delay(200); // debounce
+        return;
+      }
+      if (pointInRect(x, y, TIMER_SETUP_PLUS_X, TIMER_SETUP_ADJ_Y, TIMER_SETUP_ADJ_W, TIMER_SETUP_ADJ_H)) {
+        adjustTimerMinutes(1);
+        delay(200); // debounce
+        return;
+      }
+      if (pointInRect(x, y, TIMER_START_BTN_X, TIMER_START_BTN_Y, TIMER_START_BTN_W, TIMER_START_BTN_H)) {
+        startTimer();
+        delay(300); // debounce
+        return;
+      }
+    } else if (timerPhase == TIMER_RUNNING) {
+      // celowo brak przycisku "Wstecz" - dopoki minutnik dziala, trzeba go zapauzowac
+      // albo zresetowac, zeby wyjsc (patrz odpowiedz w rozmowie o blokadzie usypiania)
+      if (pointInRect(x, y, TIMER_PAUSE_BTN_X, TIMER_PAUSE_BTN_Y, TIMER_PAUSE_BTN_W, TIMER_PAUSE_BTN_H)) {
+        pauseTimer();
+        delay(300); // debounce
+        return;
+      }
+      if (pointInRect(x, y, TIMER_RESET_BTN_X, TIMER_RESET_BTN_Y, TIMER_RESET_BTN_W, TIMER_RESET_BTN_H)) {
+        resetTimer();
+        delay(300); // debounce
+        return;
+      }
+    } else if (timerPhase == TIMER_PAUSED) {
+      if (pointInRect(x, y, TIMER_PAUSE_BTN_X, TIMER_PAUSE_BTN_Y, TIMER_PAUSE_BTN_W, TIMER_PAUSE_BTN_H)) {
+        resumeTimer();
+        delay(300); // debounce
+        return;
+      }
+      if (pointInRect(x, y, TIMER_RESET_BTN_X, TIMER_RESET_BTN_Y, TIMER_RESET_BTN_W, TIMER_RESET_BTN_H)) {
+        resetTimer();
+        delay(300); // debounce
+        return;
+      }
+    } else { // TIMER_DONE
+      if (pointInRect(x, y, TIMER_START_BTN_X, TIMER_START_BTN_Y, TIMER_START_BTN_W, TIMER_START_BTN_H)) {
+        renderTimerSetup();
+        delay(300); // debounce
+        return;
       }
     }
   } else { // SCREEN_DRAWING

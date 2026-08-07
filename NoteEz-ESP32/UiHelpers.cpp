@@ -22,9 +22,19 @@ void drawTopButtons() {
   display.setCursor(REFRESH_BTN_X + 10, REFRESH_BTN_Y + 12);
   display.print("Odswiez");
 
-  display.fillRoundRect(RESET_BTN_X + 4, RESET_BTN_Y + 2, RESET_BTN_W - 8, RESET_BTN_H - 4, 6, COLOR_RESET);
+  display.fillRoundRect(TIMER_BTN_X + 4, TIMER_BTN_Y + 2, TIMER_BTN_W - 8, TIMER_BTN_H - 4, 6, COLOR_PRIMARY);
+  display.setTextColor(COLOR_ON_ACCENT);
+  display.setCursor(TIMER_BTN_X + 12, TIMER_BTN_Y + 12);
+  display.print("Timer");
+}
+
+// przycisk resetu WiFi/parowania - malutki, w lewym dolnym rogu (patrz komentarz przy
+// RESET_BTN_* w Config.h - uzywany bardzo rzadko, wiec nie zasluguje na eksponowane miejsce)
+void drawResetButton() {
+  display.fillRoundRect(RESET_BTN_X + 2, RESET_BTN_Y + 2, RESET_BTN_W - 4, RESET_BTN_H - 4, 5, COLOR_RESET);
   display.setTextColor(COLOR_TEXT);
-  display.setCursor(RESET_BTN_X + 10, RESET_BTN_Y + 12);
+  display.setTextSize(1);
+  display.setCursor(RESET_BTN_X + 5, RESET_BTN_Y + RESET_BTN_H / 2 - 4);
   display.print("Reset");
 }
 
@@ -51,6 +61,14 @@ String normalizeHost(String host) {
   host.replace("https://", "");
   while (host.endsWith("/")) host.remove(host.length() - 1);
   return host;
+}
+
+bool isApiHostRawIp(const String& host) {
+  for (size_t i = 0; i < host.length(); i++) {
+    char c = host[i];
+    if (!isDigit(c) && c != '.' && c != ':') return false;
+  }
+  return host.length() > 0;
 }
 
 uint16_t hexToColor565(const String& hex) {

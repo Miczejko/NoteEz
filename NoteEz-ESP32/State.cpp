@@ -17,6 +17,12 @@ unsigned long lastActivityMillis = 0;
 
 Screen currentScreen = SCREEN_LIST;
 
+TimerPhase timerPhase = TIMER_SETUP;
+int timerMinutes = TIMER_DEFAULT_MINUTES;
+unsigned long timerEndMillis = 0;
+unsigned long timerRemainingMs = 0;
+int timerLastDisplayedSec = -1;
+
 String detailTitle;
 bool detailHasDrawing = false;
 bool detailHasAudio = false;

@@ -1,5 +1,6 @@
 #include "NoteDetailScreen.h"
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include "Display.h"
 #include "Colors.h"
@@ -135,8 +136,14 @@ void selectNote(int index) {
 
   showMessage("Wczytywanie...", notesList[index].title.c_str());
 
+  WiFiClientSecure secureClient;
+  secureClient.setInsecure();
   HTTPClient http;
-  http.begin("http://" + apiHost + "/api/device-notes/" + notesList[index].id);
+  if (isApiHostRawIp(apiHost)) {
+    http.begin("http://" + apiHost + "/api/device-notes/" + notesList[index].id);
+  } else {
+    http.begin(secureClient, "https://" + apiHost + "/api/device-notes/" + notesList[index].id);
+  }
   http.addHeader("X-Api-Key", apiKey);
   int status = http.GET();
   String response = http.getString();

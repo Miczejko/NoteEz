@@ -1,5 +1,6 @@
 #include "NotesScreen.h"
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include "Display.h"
 #include "Colors.h"
@@ -41,6 +42,7 @@ void renderNotesList() {
 
   drawTopButtons();
   drawWeatherButton();
+  drawResetButton();
   display.setTextSize(1);
 
   // TEST: odczyt SHT40 + poziom baterii - do usuniecia/przeniesienia po sprawdzeniu
@@ -122,8 +124,14 @@ void fetchNotesLite() {
     return;
   }
 
+  WiFiClientSecure secureClient;
+  secureClient.setInsecure();
   HTTPClient http;
-  http.begin("http://" + apiHost + "/api/device-notes/lite");
+  if (isApiHostRawIp(apiHost)) {
+    http.begin("http://" + apiHost + "/api/device-notes/lite");
+  } else {
+    http.begin(secureClient, "https://" + apiHost + "/api/device-notes/lite");
+  }
   http.addHeader("X-Api-Key", apiKey);
   int status = http.GET();
   String response = http.getString();

@@ -32,8 +32,16 @@ extern int listScrollRow; // indeks pierwszej widocznej notatki na liscie
 extern unsigned long lastActivityMillis; // czas ostatniego dotkniecia - do usypiania po bezczynnosci
 
 // ---- ekran szczegółów notatki ----
-enum Screen { SCREEN_LIST, SCREEN_DETAIL, SCREEN_DRAWING, SCREEN_WEATHER };
+enum Screen { SCREEN_LIST, SCREEN_DETAIL, SCREEN_DRAWING, SCREEN_WEATHER, SCREEN_TIMER };
 extern Screen currentScreen;
+
+// ---- minutnik (patrz TimerScreen.h) ----
+enum TimerPhase { TIMER_SETUP, TIMER_RUNNING, TIMER_PAUSED, TIMER_DONE };
+extern TimerPhase timerPhase;
+extern int timerMinutes;              // wybrana liczba minut na ekranie ustawiania
+extern unsigned long timerEndMillis;  // millis() docelowy koniec odliczania - wazny gdy TIMER_RUNNING
+extern unsigned long timerRemainingMs; // pozostaly czas w ms - wazny gdy TIMER_PAUSED
+extern int timerLastDisplayedSec;     // ostatnia narysowana sekunda - zeby nie przerysowywac co petle loop()
 
 // jedna zawinieta linia tresci notatki, z minimalnym formatowaniem jakie potrafi wyswietlic ESP32
 struct DetailLine {

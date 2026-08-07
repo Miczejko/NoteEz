@@ -41,16 +41,10 @@
 #define BATTERY_VOLTAGE_EMPTY 3.0f
 #define BATTERY_VOLTAGE_FULL  4.2f
 
-// domyślny host używany tylko przy pierwszej konfiguracji (potem nadpisywany przez portal WiFiManager)
-#define DEFAULT_API_HOST "192.168.100.168:8080"
-
-// przycisk "Reset WiFi" w prawym górnym rogu (ekran listy) - przytrzymanie go kasuje
-// zapisane dane WiFi + parowanie i wraca do portalu konfiguracyjnego
-#define RESET_BTN_X 260
-#define RESET_BTN_Y 0
-#define RESET_BTN_W 60
-#define RESET_BTN_H 32
-#define RESET_HOLD_MS 2000
+// domyślny host - produkcyjna wersja hostowana (Cloudflare Worker + Azure backend za nim).
+// Nadal mozna go nadpisac w portalu WiFiManager (np. na lokalny adres IP:port do testow dev),
+// ale po fabrycznym resecie/pierwszej konfiguracji urzadzenie od razu laczy sie z produkcja.
+#define DEFAULT_API_HOST "noteez.online"
 
 // przycisk "Odśwież" w lewym górnym rogu (ekran listy)
 #define REFRESH_BTN_X 0
@@ -58,7 +52,14 @@
 #define REFRESH_BTN_W 60
 #define REFRESH_BTN_H 32
 
-// przycisk "Wstecz" w lewym górnym rogu (ekran szczegółów notatki)
+// przycisk "Timer" w prawym gornym rogu (ekran listy) - dawne miejsce przycisku "Reset",
+// ktory przeniesiony zostal w mniej eksponowane miejsce (patrz RESET_BTN_* nizej)
+#define TIMER_BTN_X 260
+#define TIMER_BTN_Y 0
+#define TIMER_BTN_W 60
+#define TIMER_BTN_H 32
+
+// przycisk "Wstecz" w lewym górnym rogu (ekran szczegółów notatki / timera)
 #define BACK_BTN_X 0
 #define BACK_BTN_Y 0
 #define BACK_BTN_W 70
@@ -70,6 +71,15 @@
 #define SCROLL_BTN_Y 206
 #define SCROLL_BTN_W 55
 #define SCROLL_BTN_H 30
+
+// przycisk "Reset WiFi" w lewym dolnym rogu (ekran listy) - celowo maly, bo uzywany bardzo
+// rzadko (tylko przy zmianie sieci/sparowania). Przytrzymanie go kasuje zapisane dane WiFi +
+// parowanie i wraca do portalu konfiguracyjnego. Wyrownany do rzedu przyciskow scrolla.
+#define RESET_BTN_X 4
+#define RESET_BTN_Y SCROLL_BTN_Y
+#define RESET_BTN_W 46
+#define RESET_BTN_H SCROLL_BTN_H
+#define RESET_HOLD_MS 2000
 
 // przycisk "Rysunek" w prawym gornym rogu ekranu szczegolow (widoczny gdy notatka ma rysunki)
 #define DRAWING_BTN_X 270
@@ -121,3 +131,33 @@
 #define WEATHER_LIST_START_Y 80
 #define WEATHER_ROW_HEIGHT 18
 #define WEATHER_CONTENT_BOTTOM 200 // ponizej tego zaczynaja sie przyciski scrolla
+
+// ---- ekran timera (minutnik, patrz TimerScreen.h) ----
+#define TIMER_MIN_MINUTES 1
+#define TIMER_MAX_MINUTES 90
+#define TIMER_DEFAULT_MINUTES 5
+
+// przyciski -/+ do wyboru liczby minut (ekran ustawiania timera)
+#define TIMER_SETUP_MINUS_X 50
+#define TIMER_SETUP_PLUS_X 220
+#define TIMER_SETUP_ADJ_Y 90
+#define TIMER_SETUP_ADJ_W 50
+#define TIMER_SETUP_ADJ_H 50
+
+// przycisk "Start" (ustawianie) / "OK" (po zakonczeniu odliczania) - ta sama geometria,
+// bo oba ekrany sie nie nakladaja w czasie
+#define TIMER_START_BTN_X 100
+#define TIMER_START_BTN_Y 180
+#define TIMER_START_BTN_W 120
+#define TIMER_START_BTN_H 42
+
+// przyciski "Pauza"/"Wznow" i "Reset" (ekran odliczania)
+#define TIMER_PAUSE_BTN_X 50
+#define TIMER_PAUSE_BTN_Y 180
+#define TIMER_PAUSE_BTN_W 100
+#define TIMER_PAUSE_BTN_H 42
+
+#define TIMER_RESET_BTN_X 170
+#define TIMER_RESET_BTN_Y 180
+#define TIMER_RESET_BTN_W 100
+#define TIMER_RESET_BTN_H 42

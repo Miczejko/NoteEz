@@ -1,5 +1,6 @@
 #include "WifiPairing.h"
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include "Display.h"
 #include "Colors.h"
@@ -40,7 +41,8 @@ bool claimDevice(const String& code) {
 
   showMessage("Parowanie...", code.c_str());
 
-  String url = "http://" + apiHost + "/api/devices/claim";
+  bool rawIp = isApiHostRawIp(apiHost);
+  String url = (rawIp ? "http://" : "https://") + apiHost + "/api/devices/claim";
   Serial.println("claim URL: " + url);
   Serial.printf("WiFi status=%d mode=%d ip=%s\n", WiFi.status(), WiFi.getMode(), WiFi.localIP().toString().c_str());
 
@@ -61,9 +63,15 @@ bool claimDevice(const String& code) {
       delay(1000);
     }
 
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure();
     HTTPClient http;
     http.setConnectTimeout(5000);
-    http.begin(url);
+    if (rawIp) {
+      http.begin(url);
+    } else {
+      http.begin(secureClient, url);
+    }
     http.addHeader("Content-Type", "application/json");
 
     status = http.POST(body);
