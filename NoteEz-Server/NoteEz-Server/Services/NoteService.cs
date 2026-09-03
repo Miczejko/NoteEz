@@ -1,21 +1,87 @@
 using NoteEz_Server.Models;
 using Microsoft.EntityFrameworkCore;
 using NoteEz_Server.Data;
+using System.Text.RegularExpressions;
 
 namespace NoteEz_Server.Services
 {
     // Application/Services/NoteService.cs
+
+    public record MentionNotification(Guid UserId, Notification Notification);
 
     public class NoteService
     {
         private readonly AppDbContext _db;
         private readonly NoteAudioService _audioService;
 
+        // Te same znaki co dozwolone w nazwie uzytkownika przy rejestracji (RegisterDto).
+        private static readonly Regex MentionRegex = new(@"@([A-Za-z0-9_.-]{3,32})", RegexOptions.Compiled);
+        private const int MentionThrottleSeconds = 60;
 
         public NoteService(AppDbContext db, NoteAudioService audioService)
         {
             _db = db;
             _audioService = audioService;
+        }
+
+        // Wykrywa @nazwaUzytkownika w tresci notatki i tworzy powiadomienia dla
+        // wspomnianych czlonkow grupy - tylko notatki grupowe maja sens do oznaczania,
+        // bo prywatna notatka nie ma innych czlonkow z dostepem. Throttlowane per
+        // odbiorca (nie per notatka) - max jedno powiadomienie na minute, niezaleznie
+        // od tego ile razy w tym czasie ten sam user zostanie oznaczony gdziekolwiek.
+        private async Task<List<MentionNotification>> ProcessMentionsAsync(Note note, Guid authorUserId)
+        {
+            var result = new List<MentionNotification>();
+            if (note.GroupId is null) return result;
+
+            var plainText = TipTapPlainTextExtractor.Extract(note.TextContent);
+            var usernames = MentionRegex.Matches(plainText)
+                .Select(m => m.Groups[1].Value)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (usernames.Count == 0) return result;
+
+            var author = await _db.Users.FirstOrDefaultAsync(u => u.Id == authorUserId);
+            var group = await _db.Groups.FirstOrDefaultAsync(g => g.Id == note.GroupId);
+
+            var mentionedUsers = await _db.GroupMembers
+                .Where(m => m.GroupId == note.GroupId && m.UserId != authorUserId)
+                .Include(m => m.User)
+                .Where(m => usernames.Contains(m.User.Username))
+                .Select(m => m.User)
+                .ToListAsync();
+
+            var now = DateTime.UtcNow;
+            foreach (var user in mentionedUsers)
+            {
+                var recentlyNotified = await _db.Notifications.AnyAsync(n =>
+                    n.UserId == user.Id
+                    && n.Type == "Mention"
+                    && n.CreatedAt > now.AddSeconds(-MentionThrottleSeconds));
+                if (recentlyNotified) continue;
+
+                var notification = new Notification
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = user.Id,
+                    Type = "Mention",
+                    PayloadJson = System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        noteId = note.Id,
+                        noteTitle = note.Title,
+                        groupId = note.GroupId,
+                        groupName = group?.Name,
+                        mentionedByUsername = author?.Username
+                    }),
+                    IsRead = false,
+                    CreatedAt = now
+                };
+                _db.Notifications.Add(notification);
+                result.Add(new MentionNotification(user.Id, notification));
+            }
+
+            if (result.Count > 0) await _db.SaveChangesAsync();
+            return result;
         }
 
         private async Task EnsureGroupMemberAsync(Guid userId, Guid groupId)
@@ -25,7 +91,7 @@ namespace NoteEz_Server.Services
                 throw new UnauthorizedAccessException("Nie jesteś członkiem tej grupy.");
         }
 
-        public async Task<NoteDto> CreateAsync(Guid userId, CreateNoteRequest req)
+        public async Task<(NoteDto Note, List<MentionNotification> Mentions)> CreateAsync(Guid userId, CreateNoteRequest req)
         {
             if (req.GroupId.HasValue)
                 await EnsureGroupMemberAsync(userId, req.GroupId.Value);
@@ -46,8 +112,10 @@ namespace NoteEz_Server.Services
             _db.Notes.Add(note);
             await _db.SaveChangesAsync();
 
+            var mentions = await ProcessMentionsAsync(note, userId);
+
             var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
-            return ToDto(note, user?.Username ?? "");
+            return (ToDto(note, user?.Username ?? ""), mentions);
         }
 
         public async Task<List<NoteDto>> GetAllAsync(Guid userId, Guid? groupId = null)
@@ -135,16 +203,16 @@ namespace NoteEz_Server.Services
             return await _db.GroupMembers.AnyAsync(m => m.GroupId == note.GroupId.Value && m.UserId == userId);
         }
 
-        public async Task<NoteDto?> UpdateAsync(Guid userId, Guid noteId, UpdateNoteRequest req)
+        public async Task<(NoteDto? Note, List<MentionNotification> Mentions)> UpdateAsync(Guid userId, Guid noteId, UpdateNoteRequest req)
         {
             var note = await _db.Notes
                 .Include(n => n.Drawings)
                 .Include(n => n.AudioClips)
                 .Include(n => n.User)
                 .FirstOrDefaultAsync(n => n.Id == noteId);
-            if (note is null) return null;
+            if (note is null) return (null, new List<MentionNotification>());
 
-            if (!await CanEditAsync(userId, note)) return null;
+            if (!await CanEditAsync(userId, note)) return (null, new List<MentionNotification>());
 
             if (req.Title is not null) note.Title = string.IsNullOrWhiteSpace(req.Title) ? "Bez tytułu" : req.Title;
             if (req.TextContent is not null) note.TextContent = req.TextContent;
@@ -174,7 +242,8 @@ namespace NoteEz_Server.Services
                 throw new ConcurrencyConflictException();
             }
 
-            return ToDto(note, note.User?.Username ?? "");
+            var mentions = await ProcessMentionsAsync(note, userId);
+            return (ToDto(note, note.User?.Username ?? ""), mentions);
         }
 
         public async Task<bool> DeleteAsync(Guid userId, Guid noteId)

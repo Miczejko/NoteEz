@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
 import { useNotificationsStore } from '../stores/notifications'
 import { useGroupsStore } from '../stores/groups'
 import signalr from '../api/signalr'
@@ -7,6 +8,7 @@ import ToolbarIcon from './ToolbarIcon.vue'
 
 const notificationsStore = useNotificationsStore()
 const groupsStore = useGroupsStore()
+const router = useRouter()
 
 const open = ref(false)
 const respondingId = ref(null)
@@ -47,6 +49,10 @@ async function handleClickNotification(n) {
     } catch {
       /* ignore */
     }
+  }
+  if (n.type === 'Mention' && n.payload?.noteId) {
+    close()
+    router.push(`/notes/${n.payload.noteId}`)
   }
 }
 
@@ -136,6 +142,14 @@ function formatDate(dateStr) {
                 Odrzuć
               </button>
             </div>
+          </template>
+          <template v-else-if="n.type === 'Mention'">
+            <p class="notification-text">
+              <strong>{{ n.payload?.mentionedByUsername || 'Ktoś' }}</strong>
+              oznaczył(a) Cię w notatce
+              <strong>{{ n.payload?.noteTitle || 'bez tytułu' }}</strong>
+              <span v-if="n.payload?.groupName"> w grupie {{ n.payload.groupName }}</span>
+            </p>
           </template>
           <template v-else>
             <p class="notification-text">{{ n.type }}</p>

@@ -11,6 +11,7 @@ import ToolbarIcon from './ToolbarIcon.vue'
 const props = defineProps({
   modelValue: { type: [String, Object], default: null },
   noteId: { type: String, default: null },
+  mentionCandidates: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -43,6 +44,20 @@ const editor = useEditor({
 
 function insertDrawing() {
   editor.value?.chain().focus().insertContent({ type: 'drawingBlock', attrs: { drawingId: null } }).run()
+}
+
+// Oznaczanie: "@nazwaUzytkownika" jest zwyklym tekstem - backend rozpoznaje je
+// regexem przy zapisie i wysyla powiadomienie. Ten przycisk to tylko wygoda
+// (dropdown z czlonkami grupy), zeby nie trzeba bylo pamietac/przepisywac nazw.
+const showMentionMenu = ref(false)
+
+function toggleMentionMenu() {
+  showMentionMenu.value = !showMentionMenu.value
+}
+
+function insertMention(username) {
+  editor.value?.chain().focus().insertContent(`@${username} `).run()
+  showMentionMenu.value = false
 }
 
 watch(
@@ -123,6 +138,21 @@ onBeforeUnmount(() => {
       <button type="button" title="Cytat" :class="{ active: editor.isActive('blockquote') }" @click="editor.chain().focus().toggleBlockquote().run()"><ToolbarIcon name="quote" /></button>
       <button type="button" title="Blok kodu" :class="{ active: editor.isActive('codeBlock') }" @click="editor.chain().focus().toggleCodeBlock().run()"><ToolbarIcon name="code" /></button>
       <button type="button" title="Wstaw rysunek" @click="insertDrawing"><ToolbarIcon name="drawing" /></button>
+      <span v-if="mentionCandidates.length" class="mention-wrap">
+        <button type="button" title="Oznacz osobę (@)" @click="toggleMentionMenu">@</button>
+        <div v-if="showMentionMenu" class="mention-backdrop" @click="showMentionMenu = false" />
+        <div v-if="showMentionMenu" class="mention-menu card">
+          <button
+            v-for="username in mentionCandidates"
+            :key="username"
+            type="button"
+            class="mention-item"
+            @click="insertMention(username)"
+          >
+            @{{ username }}
+          </button>
+        </div>
+      </span>
       <span class="divider" />
       <label class="color-picker" :style="{ '--swatch': editor.getAttributes('textStyle').color || 'transparent' }">
         A
@@ -206,6 +236,49 @@ onBeforeUnmount(() => {
   background: var(--color-secondary);
   color: #fff;
   border-color: var(--color-secondary);
+}
+
+.mention-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.mention-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+}
+
+.mention-menu {
+  position: absolute;
+  top: calc(100% + 0.375rem);
+  left: 0;
+  z-index: 151;
+  min-width: 160px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 0.375rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.toolbar .mention-item {
+  width: 100%;
+  height: auto;
+  justify-content: flex-start;
+  text-align: left;
+  padding: 0.375rem 0.5rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 0.875rem;
+}
+
+.toolbar .mention-item:hover {
+  background: var(--color-surface-alt);
+  border-color: transparent;
 }
 
 .toolbar .divider {

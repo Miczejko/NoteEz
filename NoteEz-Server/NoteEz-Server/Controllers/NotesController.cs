@@ -38,6 +38,15 @@ namespace NoteEz_Server.Controllers
                 .SendAsync("NoteChanged", new { noteId, changeType });
         }
 
+        private async Task BroadcastMentionsAsync(List<MentionNotification> mentions)
+        {
+            foreach (var m in mentions)
+            {
+                var dto = new NotificationDto(m.Notification.Id, m.Notification.Type, m.Notification.PayloadJson, m.Notification.IsRead, m.Notification.CreatedAt);
+                await _hub.Clients.Group($"user-{m.UserId}").SendAsync("ReceiveNotification", dto);
+            }
+        }
+
         // --- Notatka: tekst/tytuł ---
 
         [HttpGet]
@@ -77,8 +86,9 @@ namespace NoteEz_Server.Controllers
         {
             try
             {
-                var note = await _notes.CreateAsync(UserId, req);
+                var (note, mentions) = await _notes.CreateAsync(UserId, req);
                 await BroadcastNoteChangedAsync(note.Id, note.GroupId, "created");
+                await BroadcastMentionsAsync(mentions);
                 return CreatedAtAction(nameof(GetById), new { id = note.Id }, note);
             }
             catch (UnauthorizedAccessException) { return Forbid(); }
@@ -89,10 +99,11 @@ namespace NoteEz_Server.Controllers
         {
             try
             {
-                var updated = await _notes.UpdateAsync(UserId, id, req);
+                var (updated, mentions) = await _notes.UpdateAsync(UserId, id, req);
                 if (updated is null) return NotFound();
 
                 await BroadcastNoteChangedAsync(id, updated.GroupId, "updated");
+                await BroadcastMentionsAsync(mentions);
                 return Ok(updated);
             }
             catch (ConcurrencyConflictException)

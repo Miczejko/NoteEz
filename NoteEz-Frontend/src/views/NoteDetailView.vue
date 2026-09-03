@@ -3,6 +3,8 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNotesStore } from '../stores/notes'
 import { useCalendarNotesStore } from '../stores/calendarNotes'
+import { useGroupsStore } from '../stores/groups'
+import { useAuthStore } from '../stores/auth'
 import signalr from '../api/signalr'
 import AppLayout from '../components/AppLayout.vue'
 import AudioRecorder from '../components/AudioRecorder.vue'
@@ -13,6 +15,8 @@ const route = useRoute()
 const router = useRouter()
 const notesStore = useNotesStore()
 const calendarStore = useCalendarNotesStore()
+const groupsStore = useGroupsStore()
+const auth = useAuthStore()
 
 const title = ref('')
 const textContent = ref('')
@@ -30,6 +34,13 @@ const backTarget = computed(() => {
   if (note.value?.groupId) return { name: 'group-detail', params: { id: note.value.groupId } }
   return note.value?.scheduledDate ? { name: 'calendar' } : { name: 'notes' }
 })
+const mentionCandidates = computed(() =>
+  note.value?.groupId
+    ? (groupsStore.members[note.value.groupId] || [])
+        .map((m) => m.username)
+        .filter((u) => u !== auth.username)
+    : []
+)
 
 function invalidateCalendarMonthFor(scheduledDate) {
   if (!scheduledDate) return
@@ -80,6 +91,9 @@ async function loadNote(id) {
     color.value = note.value.color || null
     if (note.value.groupId) {
       joinEditing(note.value.id)
+      if (!groupsStore.members[note.value.groupId]) {
+        groupsStore.fetchMembers(note.value.groupId).catch(() => {})
+      }
     }
   }
 }
@@ -260,6 +274,7 @@ async function handleDeleteAudio(audioId) {
           :key="note.id"
           :model-value="textContent"
           :note-id="note.id"
+          :mention-candidates="mentionCandidates"
           @update:model-value="handleContentUpdate"
         />
       </div>
