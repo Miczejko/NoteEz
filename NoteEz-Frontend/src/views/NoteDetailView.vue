@@ -1,8 +1,9 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNotesStore } from '../stores/notes'
 import { useCalendarNotesStore } from '../stores/calendarNotes'
+import signalr from '../api/signalr'
 import AppLayout from '../components/AppLayout.vue'
 import AudioRecorder from '../components/AudioRecorder.vue'
 import AudioPlayer from '../components/AudioPlayer.vue'
@@ -18,11 +19,17 @@ const textContent = ref('')
 const color = ref(null)
 const saving = ref(false)
 const activeTab = ref('text')
+const conflict = ref(false)
+const editorPresence = ref(null) // username of another user currently editing, or null
+let joinedNoteId = null
 
 const noteColors = ['#8963ba', '#d64545', '#e08a2c', '#e0c93c', '#3aa0a0', '#3468c0', '#90c290']
 
 const note = computed(() => notesStore.currentNote)
-const backTarget = computed(() => (note.value?.scheduledDate ? { name: 'calendar' } : { name: 'notes' }))
+const backTarget = computed(() => {
+  if (note.value?.groupId) return { name: 'group-detail', params: { id: note.value.groupId } }
+  return note.value?.scheduledDate ? { name: 'calendar' } : { name: 'notes' }
+})
 
 function invalidateCalendarMonthFor(scheduledDate) {
   if (!scheduledDate) return
@@ -30,25 +37,68 @@ function invalidateCalendarMonthFor(scheduledDate) {
   calendarStore.invalidateMonth(year, month)
 }
 
-onMounted(async () => {
-  await notesStore.fetchById(route.params.id)
+function handleEditorPresence({ userId, username, editing }) {
+  editorPresence.value = editing ? username : null
+}
+
+// Broadcast idzie do calego kanalu note-{id}, wiec dostajemy tez echo wlasnego
+// zapisu - odrozniamy je krotkim oknem czasowym po naszym ostatnim udanym save,
+// zeby nie pokazywac banera konfliktu po kazdym wlasnym autosave.
+let lastLocalSaveAt = 0
+const SELF_ECHO_WINDOW_MS = 3000
+
+function handleNoteChanged({ noteId, changeType }) {
+  if (!note.value || noteId !== note.value.id) return
+  if (changeType === 'deleted') {
+    conflict.value = true
+    return
+  }
+  if (Date.now() - lastLocalSaveAt < SELF_ECHO_WINDOW_MS) return
+  conflict.value = true
+}
+
+function joinEditing(id) {
+  if (!id) return
+  joinedNoteId = id
+  signalr.invoke('JoinNoteEditing', id)
+}
+
+function leaveEditing() {
+  if (!joinedNoteId) return
+  signalr.invoke('LeaveNoteEditing', joinedNoteId)
+  joinedNoteId = null
+}
+
+async function loadNote(id) {
+  conflict.value = false
+  editorPresence.value = null
+  leaveEditing()
+  await notesStore.fetchById(id)
   if (note.value) {
     title.value = note.value.title || ''
     textContent.value = note.value.textContent || ''
     color.value = note.value.color || null
+    if (note.value.groupId) {
+      joinEditing(note.value.id)
+    }
   }
+}
+
+onMounted(() => {
+  signalr.on('EditorPresence', handleEditorPresence)
+  signalr.on('NoteChanged', handleNoteChanged)
+  loadNote(route.params.id)
+})
+
+onBeforeUnmount(() => {
+  signalr.off('EditorPresence', handleEditorPresence)
+  signalr.off('NoteChanged', handleNoteChanged)
+  leaveEditing()
 })
 
 watch(
   () => route.params.id,
-  async (id) => {
-    await notesStore.fetchById(id)
-    if (note.value) {
-      title.value = note.value.title || ''
-      textContent.value = note.value.textContent || ''
-      color.value = note.value.color || null
-    }
-  }
+  (id) => loadNote(id)
 )
 
 function pickColor(c) {
@@ -68,26 +118,57 @@ function handleContentUpdate(json) {
 }
 
 async function saveNote() {
-  if (!note.value) return
+  if (!note.value || conflict.value) return
   saving.value = true
+  // Ustawiane PRZED wyslaniem zadania, nie po nim - broadcast NoteChanged od
+  // serwera moze dotrzec przez SignalR szybciej niz wroci odpowiedz HTTP na
+  // nasz wlasny zapis, wiec okno musi obejmowac caly czas trwania zadania.
+  lastLocalSaveAt = Date.now()
   try {
     await notesStore.update(note.value.id, {
       title: title.value,
       textContent: textContent.value,
       color: color.value || '',
+      rowVersionBase64: note.value.rowVersion || null,
     })
     invalidateCalendarMonthFor(note.value.scheduledDate)
+  } catch (e) {
+    if (e.isConflict) {
+      conflict.value = true
+    } else {
+      throw e
+    }
   } finally {
     saving.value = false
+  }
+}
+
+async function handleReload() {
+  conflict.value = false
+  const groupId = note.value?.groupId
+  try {
+    await loadNote(note.value?.id || route.params.id)
+  } catch (e) {
+    if (e.response?.status === 404) {
+      // notatka zostala usunieta przez kogos innego - nie ma juz gdzie odswiezac
+      router.push(groupId ? { name: 'group-detail', params: { id: groupId } } : { name: 'notes' })
+      return
+    }
+    throw e
   }
 }
 
 async function handleDelete() {
   if (!confirm('Czy na pewno chcesz usunąć tę notatkę?')) return
   const scheduledDate = note.value.scheduledDate
+  const groupId = note.value.groupId
   await notesStore.remove(note.value.id)
   invalidateCalendarMonthFor(scheduledDate)
-  router.push(scheduledDate ? { name: 'calendar' } : { name: 'notes' })
+  if (groupId) {
+    router.push({ name: 'group-detail', params: { id: groupId } })
+  } else {
+    router.push(scheduledDate ? { name: 'calendar' } : { name: 'notes' })
+  }
 }
 
 async function handleRecorded({ blob, durationSeconds }) {
@@ -112,6 +193,17 @@ async function handleDeleteAudio(audioId) {
           <span v-if="saving" class="save-indicator">Zapisywanie…</span>
           <button class="btn btn-danger btn-sm" @click="handleDelete">Usuń</button>
         </div>
+      </div>
+
+      <p v-if="note.groupId && note.authorUsername" class="note-author">dodane przez {{ note.authorUsername }}</p>
+
+      <div v-if="editorPresence" class="presence-banner">
+        <strong>{{ editorPresence }}</strong> aktualnie edytuje tę notatkę
+      </div>
+
+      <div v-if="conflict" class="conflict-banner">
+        <span>Notatka została zmieniona przez kogoś innego. Odśwież, aby zobaczyć najnowszą wersję.</span>
+        <button class="btn btn-accent btn-sm" @click="handleReload">Odśwież</button>
       </div>
 
       <input
@@ -220,6 +312,33 @@ async function handleDeleteAudio(audioId) {
 .save-indicator {
   font-size: 0.8125rem;
   color: var(--color-text-muted);
+}
+
+.note-author {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.presence-banner {
+  font-size: 0.875rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--radius-sm);
+  background: rgba(115, 171, 132, 0.15);
+  color: var(--muted-teal);
+}
+
+.conflict-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.875rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  background: rgba(224, 118, 110, 0.15);
+  color: var(--color-danger);
 }
 
 .title-input {

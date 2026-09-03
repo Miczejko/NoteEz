@@ -14,8 +14,13 @@ namespace NoteEz_Server.Models
         public DateOnly? ScheduledDate { get; set; } // dzien w kalendarzu, do ktorego przypisana jest notatka
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
+        public Guid? GroupId { get; set; }
+
+        [Timestamp]
+        public byte[] RowVersion { get; set; }
 
         public User User { get; set; }
+        public Group? Group { get; set; }
         public ICollection<NoteDrawing> Drawings { get; set; } = new List<NoteDrawing>();
         public ICollection<NoteAudio> AudioClips { get; set; } = new List<NoteAudio>();
     }
@@ -28,12 +33,22 @@ namespace NoteEz_Server.Models
         DateOnly? ScheduledDate,
         DateTime UpdatedAt,
         IReadOnlyList<NoteDrawingDto> Drawings,
-        IReadOnlyList<NoteAudioDto> AudioClips
+        IReadOnlyList<NoteAudioDto> AudioClips,
+        string AuthorUsername,
+        Guid? GroupId,
+        string RowVersion
     );
 
     public record NoteLiteDto(Guid Id, string Title, bool HasDrawing, bool HasAudio, string? Color);
 
-    public record CalendarNoteDto(Guid Id, string Title, string? TextContent, string? Color, DateOnly ScheduledDate);
+    public record CalendarNoteDto(
+        Guid Id,
+        string Title,
+        string? TextContent,
+        string? Color,
+        DateOnly ScheduledDate,
+        string AuthorUsername,
+        Guid? GroupId);
 
     public record CreateNoteRequest(
         [Required, StringLength(200, MinimumLength = 1)]
@@ -42,7 +57,8 @@ namespace NoteEz_Server.Models
         string? TextContent,
         [RegularExpression(@"^#[0-9a-fA-F]{6}$")]
         string? Color,
-        DateOnly? ScheduledDate);
+        DateOnly? ScheduledDate,
+        Guid? GroupId);
 
     public record UpdateNoteRequest(
         [StringLength(200)]
@@ -51,11 +67,18 @@ namespace NoteEz_Server.Models
         string? TextContent,
         [RegularExpression(@"^(#[0-9a-fA-F]{6})?$")]
         string? Color,
-        DateOnly? ScheduledDate);
+        DateOnly? ScheduledDate,
+        string? RowVersionBase64);
 
     public record AddDrawingRequest(
         [Required, StringLength(2_000_000)]
         string StrokesJson);
 
     public record ReorderRequest([Required] List<Guid> OrderedIds);
+
+    // Rzucany, gdy ktos inny zapisal notatke miedzy odczytem a zapisem (optimistic concurrency, RowVersion).
+    public class ConcurrencyConflictException : Exception
+    {
+        public ConcurrencyConflictException() : base("Notatka zostala zmieniona przez kogos innego.") { }
+    }
 }

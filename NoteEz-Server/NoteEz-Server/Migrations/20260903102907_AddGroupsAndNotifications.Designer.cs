@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NoteEz_Server.Data;
 
@@ -11,9 +12,11 @@ using NoteEz_Server.Data;
 namespace NoteEz_Server.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260903102907_AddGroupsAndNotifications")]
+    partial class AddGroupsAndNotifications
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -92,8 +95,9 @@ namespace NoteEz_Server.Migrations
                     b.Property<Guid>("InvitedByUserId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("InvitedUserId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<string>("InvitedEmail")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
@@ -101,8 +105,6 @@ namespace NoteEz_Server.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("GroupId");
-
-                    b.HasIndex("InvitedUserId");
 
                     b.ToTable("GroupInvites");
                 });
@@ -408,15 +410,7 @@ namespace NoteEz_Server.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("NoteEz_Server.Models.User", "InvitedUser")
-                        .WithMany()
-                        .HasForeignKey("InvitedUserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation("Group");
-
-                    b.Navigation("InvitedUser");
                 });
 
             modelBuilder.Entity("NoteEz_Server.Models.GroupMember", b =>

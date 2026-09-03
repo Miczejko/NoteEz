@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
+using NoteEz_Server.Hubs;
 using NoteEz_Server.Models;
 using NoteEz_Server.Services;
 using System.Security.Claims;
@@ -15,48 +17,101 @@ namespace NoteEz_Server.Controllers
     {
         private readonly NoteService _notes;
         private readonly NoteAudioService _audio;
+        private readonly IHubContext<AppHub> _hub;
 
-        public NotesController(NoteService notes, NoteAudioService audio)
+        public NotesController(NoteService notes, NoteAudioService audio, IHubContext<AppHub> hub)
         {
             _notes = notes;
             _audio = audio;
+            _hub = hub;
         }
 
         private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
+        private async Task BroadcastNoteChangedAsync(Guid noteId, Guid? groupId, string changeType)
+        {
+            if (groupId is null) return;
+
+            await _hub.Clients.Group($"group-{groupId}")
+                .SendAsync("NoteChanged", new { noteId, changeType });
+            await _hub.Clients.Group($"note-{noteId}")
+                .SendAsync("NoteChanged", new { noteId, changeType });
+        }
+
         // --- Notatka: tekst/tytuł ---
 
         [HttpGet]
-        public async Task<IActionResult> GetAll() => Ok(await _notes.GetAllAsync(UserId));
+        public async Task<IActionResult> GetAll([FromQuery] Guid? groupId)
+        {
+            try
+            {
+                return Ok(await _notes.GetAllAsync(UserId, groupId));
+            }
+            catch (UnauthorizedAccessException) { return Forbid(); }
+        }
 
         [HttpGet("calendar")]
-        public async Task<IActionResult> GetByMonth([FromQuery] int year, [FromQuery] int month)
+        public async Task<IActionResult> GetByMonth([FromQuery] int year, [FromQuery] int month, [FromQuery] Guid? groupId)
         {
             if (month < 1 || month > 12) return BadRequest(new { error = "Nieprawidłowy miesiąc." });
-            return Ok(await _notes.GetByMonthAsync(UserId, year, month));
+            try
+            {
+                return Ok(await _notes.GetByMonthAsync(UserId, year, month, groupId));
+            }
+            catch (UnauthorizedAccessException) { return Forbid(); }
         }
 
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetById(Guid id)
+        public async Task<IActionResult> GetById(Guid id, [FromQuery] Guid? groupId)
         {
-            var note = await _notes.GetByIdAsync(UserId, id);
-            return note is null ? NotFound() : Ok(note);
+            try
+            {
+                var note = await _notes.GetByIdAsync(UserId, id, groupId);
+                return note is null ? NotFound() : Ok(note);
+            }
+            catch (UnauthorizedAccessException) { return Forbid(); }
         }
 
         [HttpPost]
         public async Task<IActionResult> Create(CreateNoteRequest req)
         {
-            var note = await _notes.CreateAsync(UserId, req);
-            return CreatedAtAction(nameof(GetById), new { id = note.Id }, note);
+            try
+            {
+                var note = await _notes.CreateAsync(UserId, req);
+                await BroadcastNoteChangedAsync(note.Id, note.GroupId, "created");
+                return CreatedAtAction(nameof(GetById), new { id = note.Id }, note);
+            }
+            catch (UnauthorizedAccessException) { return Forbid(); }
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(Guid id, UpdateNoteRequest req)
-            => await _notes.UpdateAsync(UserId, id, req) ? NoContent() : NotFound();
+        {
+            try
+            {
+                var updated = await _notes.UpdateAsync(UserId, id, req);
+                if (updated is null) return NotFound();
+
+                await BroadcastNoteChangedAsync(id, updated.GroupId, "updated");
+                return Ok(updated);
+            }
+            catch (ConcurrencyConflictException)
+            {
+                return Conflict(new { error = "Notatka została zmieniona przez kogoś innego. Odśwież i spróbuj ponownie." });
+            }
+        }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
-            => await _notes.DeleteAsync(UserId, id) ? NoContent() : NotFound();
+        {
+            var groupId = await _notes.GetGroupIdAsync(id);
+
+            var deleted = await _notes.DeleteAsync(UserId, id);
+            if (!deleted) return NotFound();
+
+            await BroadcastNoteChangedAsync(id, groupId, "deleted");
+            return NoContent();
+        }
 
         // --- Rysunki ---
 

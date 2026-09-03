@@ -122,6 +122,16 @@ defineProps({
     <template v-else-if="name === 'close'">
       <path d="M5 5l10 10M15 5 5 15" />
     </template>
+    <template v-else-if="name === 'users'">
+      <circle cx="7" cy="7" r="2.6" />
+      <path d="M2.5 16c0-2.7 2-4.5 4.5-4.5s4.5 1.8 4.5 4.5" />
+      <circle cx="14" cy="7.5" r="2.1" />
+      <path d="M12.8 11.7c1.9.3 3.2 1.7 3.2 4" />
+    </template>
+    <template v-else-if="name === 'bell'">
+      <path d="M6 8a4 4 0 0 1 8 0c0 3.5 1.2 4.5 1.2 4.5H4.8S6 11.5 6 8Z" />
+      <path d="M8.5 15a1.5 1.5 0 0 0 3 0" />
+    </template>
   </svg>
 </template>
 

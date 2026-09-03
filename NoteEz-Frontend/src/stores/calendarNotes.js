@@ -2,8 +2,8 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api from '../api/client'
 
-function monthKey(year, month) {
-  return `${year}-${String(month).padStart(2, '0')}`
+function monthKey(year, month, groupId = null) {
+  return groupId ? `${groupId}:${year}-${String(month).padStart(2, '0')}` : `${year}-${String(month).padStart(2, '0')}`
 }
 
 export const useCalendarNotesStore = defineStore('calendarNotes', () => {
@@ -11,14 +11,16 @@ export const useCalendarNotesStore = defineStore('calendarNotes', () => {
   const loading = ref(false)
   const error = ref(null)
 
-  async function fetchMonth(year, month, force = false) {
-    const key = monthKey(year, month)
+  async function fetchMonth(year, month, force = false, groupId = null) {
+    const key = monthKey(year, month, groupId)
     if (!force && notesByMonth.value[key]) return notesByMonth.value[key]
 
     loading.value = true
     error.value = null
     try {
-      const { data } = await api.get('/notes/calendar', { params: { year, month } })
+      const params = { year, month }
+      if (groupId) params.groupId = groupId
+      const { data } = await api.get('/notes/calendar', { params })
       notesByMonth.value = { ...notesByMonth.value, [key]: data }
       return data
     } catch (e) {
@@ -29,8 +31,8 @@ export const useCalendarNotesStore = defineStore('calendarNotes', () => {
     }
   }
 
-  function invalidateMonth(year, month) {
-    const key = monthKey(year, month)
+  function invalidateMonth(year, month, groupId = null) {
+    const key = monthKey(year, month, groupId)
     const { [key]: _removed, ...rest } = notesByMonth.value
     notesByMonth.value = rest
   }
