@@ -238,7 +238,11 @@ async function handleRemoveMember(userId) {
 }
 
 async function handleLeave() {
-  if (!confirm('Czy na pewno chcesz opuścić tę grupę?')) return
+  const message =
+    groupMembers.value.length === 1
+      ? 'Jesteś jedynym członkiem tej grupy - opuszczenie jej spowoduje jej usunięcie. Kontynuować?'
+      : 'Czy na pewno chcesz opuścić tę grupę?'
+  if (!confirm(message)) return
   leaving.value = true
   try {
     await groupsStore.leaveGroup(groupId.value)
@@ -513,7 +517,7 @@ function formatDate(dateStr) {
         </div>
 
         <button class="btn btn-ghost btn-sm leave-btn" :disabled="leaving" @click="handleLeave">
-          {{ leaving ? 'Opuszczanie…' : 'Opuść grupę' }}
+          {{ leaving ? 'Opuszczanie…' : groupMembers.length === 1 ? 'Usuń grupę' : 'Opuść grupę' }}
         </button>
       </div>
     </div>

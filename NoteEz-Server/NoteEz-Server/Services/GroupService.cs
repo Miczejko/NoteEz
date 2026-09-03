@@ -193,6 +193,19 @@ namespace NoteEz_Server.Services
                 .FirstOrDefaultAsync(m => m.GroupId == groupId && m.UserId == userId)
                 ?? throw new KeyNotFoundException("Nie jesteś członkiem tej grupy.");
 
+            var totalMembers = await _db.GroupMembers.CountAsync(m => m.GroupId == groupId);
+
+            if (totalMembers == 1)
+            {
+                // Jedyny czlonek opuszczajacy grupe - nie ma komu jej przekazac, wiec
+                // po prostu usuwamy cala grupe (kaskadowo usunie GroupMembers/Invites,
+                // notatki grupowe wracaja do prywatnych przez SetNull na Note.GroupId).
+                var group = await _db.Groups.FirstOrDefaultAsync(g => g.Id == groupId);
+                if (group is not null) _db.Groups.Remove(group);
+                await _db.SaveChangesAsync();
+                return;
+            }
+
             if (member.Role == GroupRole.Owner)
             {
                 var otherOwners = await _db.GroupMembers
