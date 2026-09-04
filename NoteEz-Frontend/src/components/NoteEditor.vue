@@ -6,6 +6,7 @@ import { TextStyle, Color } from '@tiptap/extension-text-style'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { DrawingBlock } from '../tiptap/drawingBlock'
+import { MentionHighlight } from '../tiptap/mentionHighlight'
 import ToolbarIcon from './ToolbarIcon.vue'
 
 const props = defineProps({
@@ -36,6 +37,7 @@ const editor = useEditor({
     TaskList,
     TaskItem.configure({ nested: true }),
     DrawingBlock.configure({ noteId: props.noteId }),
+    MentionHighlight,
   ],
   onUpdate: ({ editor }) => {
     emit('update:modelValue', JSON.stringify(editor.getJSON()))
@@ -425,5 +427,31 @@ onBeforeUnmount(() => {
   padding: 0.5rem 0.75rem;
   border-radius: 6px;
   overflow-x: auto;
+}
+
+/* Oznaczenie @nazwaUzytkownika - czysto wizualne (dekoracja ProseMirror, patrz
+   tiptap/mentionHighlight.js), nie zmienia zapisanej tresci notatki. */
+@keyframes mention-pop {
+  0% {
+    transform: scale(0.85);
+    box-shadow: 0 0 0 0 rgba(58, 160, 160, 0.5);
+  }
+  60% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(58, 160, 160, 0);
+  }
+}
+
+.editor-content :deep(.mention-chip) {
+  display: inline-block;
+  color: var(--color-secondary);
+  background: rgba(58, 160, 160, 0.14);
+  border-radius: 5px;
+  padding: 0.05rem 0.3rem;
+  font-weight: 600;
+  animation: mention-pop 0.35s ease-out;
 }
 </style>
