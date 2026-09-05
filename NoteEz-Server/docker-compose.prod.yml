@@ -1,10 +1,31 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: noteez-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=noteez
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=noteez
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U noteez -d noteez
+      interval: 10s
+      retries: 10
+      start_period: 10s
+    networks:
+      - web
+
   api:
     build:
       context: .
       dockerfile: NoteEz-Server/Dockerfile
     container_name: noteez-api
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     env_file:
       - .env.prod
     environment:
@@ -46,3 +67,4 @@ networks:
 volumes:
   certbot_www:
   certbot_conf:
+  postgres_data:
