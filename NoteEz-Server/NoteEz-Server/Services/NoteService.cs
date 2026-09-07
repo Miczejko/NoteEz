@@ -24,6 +24,10 @@ namespace NoteEz_Server.Services
             _audioService = audioService;
         }
 
+        // Postgres nie generuje wartosci rowversion samodzielnie (patrz komentarz w AppDbContext) -
+        // aplikacja nadaje nowy, losowy token przy kazdym zapisie notatki.
+        private static byte[] NewRowVersion() => Guid.NewGuid().ToByteArray();
+
         // Wykrywa @nazwaUzytkownika w tresci notatki i tworzy powiadomienia dla
         // wspomnianych czlonkow grupy - tylko notatki grupowe maja sens do oznaczania,
         // bo prywatna notatka nie ma innych czlonkow z dostepem. Throttlowane per
@@ -106,7 +110,8 @@ namespace NoteEz_Server.Services
                 ScheduledDate = req.ScheduledDate,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
-                GroupId = req.GroupId
+                GroupId = req.GroupId,
+                RowVersion = NewRowVersion()
             };
 
             _db.Notes.Add(note);
@@ -232,6 +237,8 @@ namespace NoteEz_Server.Services
                     // nieprawidlowy base64 - ignorujemy sprawdzanie wersji, zapis przejdzie bez konfliktu
                 }
             }
+
+            note.RowVersion = NewRowVersion();
 
             try
             {

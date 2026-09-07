@@ -71,12 +71,12 @@ function handleNoteChanged({ noteId, changeType }) {
 function joinEditing(id) {
   if (!id) return
   joinedNoteId = id
-  signalr.invoke('JoinNoteEditing', id)
+  signalr.invoke('JoinNoteEditing', id).catch(() => {})
 }
 
 function leaveEditing() {
   if (!joinedNoteId) return
-  signalr.invoke('LeaveNoteEditing', joinedNoteId)
+  signalr.invoke('LeaveNoteEditing', joinedNoteId).catch(() => {})
   joinedNoteId = null
 }
 

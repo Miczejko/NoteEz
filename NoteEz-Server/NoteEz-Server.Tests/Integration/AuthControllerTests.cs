@@ -67,11 +67,11 @@ namespace NoteEz_Server.Tests.Integration
         {
             var email = EmailFor(username);
             await client.PostAsJsonAsync(
-                "/api/auth/register", new { username, email, password, turnstileToken = TestTurnstileToken });
+                "/api/auth/register", new { username, email, password, turnstileToken = TestTurnstileToken, consentAccepted = true });
             await VerifyEmailAsync(client, email);
 
             var loginResponse = await client.PostAsJsonAsync(
-                "/api/auth/login", new { username, password, turnstileToken = TestTurnstileToken });
+                "/api/auth/login", new { username, password, turnstileToken = TestTurnstileToken, consentAccepted = true });
             loginResponse.EnsureSuccessStatusCode();
             var body = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
             return body.GetProperty("accessToken").GetString()!;
@@ -86,11 +86,11 @@ namespace NoteEz_Server.Tests.Integration
             var email = EmailFor(username);
             await client.PostAsJsonAsync(
                 "/api/auth/register",
-                new { username, email, password = "CorrectPass1", turnstileToken = TestTurnstileToken });
+                new { username, email, password = "CorrectPass1", turnstileToken = TestTurnstileToken, consentAccepted = true });
             await VerifyEmailAsync(client, email);
 
             var response = await client.PostAsJsonAsync(
-                "/api/auth/login", new { username, password = "WrongPass1", turnstileToken = TestTurnstileToken });
+                "/api/auth/login", new { username, password = "WrongPass1", turnstileToken = TestTurnstileToken, consentAccepted = true });
 
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         }
@@ -102,7 +102,7 @@ namespace NoteEz_Server.Tests.Integration
             var client = CreateClient(factory);
             var response = await client.PostAsJsonAsync(
                 "/api/auth/login",
-                new { username = NewUsername(), password = "Whatever123", turnstileToken = TestTurnstileToken });
+                new { username = NewUsername(), password = "Whatever123", turnstileToken = TestTurnstileToken, consentAccepted = true });
 
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         }
@@ -117,11 +117,11 @@ namespace NoteEz_Server.Tests.Integration
             var username = NewUsername();
             var registerResponse = await client.PostAsJsonAsync(
                 "/api/auth/register",
-                new { username, email = EmailFor(username), password = "Password123!", turnstileToken = TestTurnstileToken });
+                new { username, email = EmailFor(username), password = "Password123!", turnstileToken = TestTurnstileToken, consentAccepted = true });
             Assert.Equal(HttpStatusCode.OK, registerResponse.StatusCode);
 
             var response = await client.PostAsJsonAsync(
-                "/api/auth/login", new { username, password = "Password123!", turnstileToken = TestTurnstileToken });
+                "/api/auth/login", new { username, password = "Password123!", turnstileToken = TestTurnstileToken, consentAccepted = true });
 
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         }
@@ -134,7 +134,7 @@ namespace NoteEz_Server.Tests.Integration
             var username = NewUsername();
             var response = await client.PostAsJsonAsync(
                 "/api/auth/register",
-                new { username, email = EmailFor(username), password = "short", turnstileToken = TestTurnstileToken });
+                new { username, email = EmailFor(username), password = "short", turnstileToken = TestTurnstileToken, consentAccepted = true });
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         }
@@ -152,6 +152,7 @@ namespace NoteEz_Server.Tests.Integration
                     email = "bad-username@test.local",
                     password = "GoodPassword1",
                     turnstileToken = TestTurnstileToken,
+                    consentAccepted = true,
                 });
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -170,6 +171,7 @@ namespace NoteEz_Server.Tests.Integration
                     email = "not-an-email",
                     password = "GoodPassword1",
                     turnstileToken = TestTurnstileToken,
+                    consentAccepted = true,
                 });
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -184,7 +186,7 @@ namespace NoteEz_Server.Tests.Integration
             var email = EmailFor(username);
             var first = await client.PostAsJsonAsync(
                 "/api/auth/register",
-                new { username, email, password = "Password123!", turnstileToken = TestTurnstileToken });
+                new { username, email, password = "Password123!", turnstileToken = TestTurnstileToken, consentAccepted = true });
             Assert.Equal(HttpStatusCode.OK, first.StatusCode);
             await VerifyEmailAsync(client, email);
 
@@ -198,6 +200,7 @@ namespace NoteEz_Server.Tests.Integration
                     email = EmailFor(NewUsername()),
                     password = "Password123!",
                     turnstileToken = TestTurnstileToken,
+                    consentAccepted = true,
                 });
 
             Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -215,13 +218,13 @@ namespace NoteEz_Server.Tests.Integration
             var email = EmailFor(firstUsername);
             var first = await client.PostAsJsonAsync(
                 "/api/auth/register",
-                new { username = firstUsername, email, password = "Password123!", turnstileToken = TestTurnstileToken });
+                new { username = firstUsername, email, password = "Password123!", turnstileToken = TestTurnstileToken, consentAccepted = true });
             Assert.Equal(HttpStatusCode.OK, first.StatusCode);
             await VerifyEmailAsync(client, email);
 
             var response = await client.PostAsJsonAsync(
                 "/api/auth/register",
-                new { username = NewUsername(), email, password = "Password123!", turnstileToken = TestTurnstileToken });
+                new { username = NewUsername(), email, password = "Password123!", turnstileToken = TestTurnstileToken, consentAccepted = true });
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             Assert.Contains(email, TestEmailCapture.RegistrationAttemptNotices);
@@ -236,10 +239,10 @@ namespace NoteEz_Server.Tests.Integration
             var email = EmailFor(username);
             await client.PostAsJsonAsync(
                 "/api/auth/register",
-                new { username, email, password = "Password123!", turnstileToken = TestTurnstileToken });
+                new { username, email, password = "Password123!", turnstileToken = TestTurnstileToken, consentAccepted = true });
             await VerifyEmailAsync(client, email);
             var loginResponse = await client.PostAsJsonAsync(
-                "/api/auth/login", new { username, password = "Password123!", turnstileToken = TestTurnstileToken });
+                "/api/auth/login", new { username, password = "Password123!", turnstileToken = TestTurnstileToken, consentAccepted = true });
             var firstCookie = ExtractCookie(loginResponse, "refreshToken");
             Assert.NotNull(firstCookie);
 
@@ -268,10 +271,10 @@ namespace NoteEz_Server.Tests.Integration
             var email = EmailFor(username);
             await client.PostAsJsonAsync(
                 "/api/auth/register",
-                new { username, email, password = "Password123!", turnstileToken = TestTurnstileToken });
+                new { username, email, password = "Password123!", turnstileToken = TestTurnstileToken, consentAccepted = true });
             await VerifyEmailAsync(client, email);
             var loginResponse = await client.PostAsJsonAsync(
-                "/api/auth/login", new { username, password = "Password123!", turnstileToken = TestTurnstileToken });
+                "/api/auth/login", new { username, password = "Password123!", turnstileToken = TestTurnstileToken, consentAccepted = true });
             var firstCookie = ExtractCookie(loginResponse, "refreshToken");
             Assert.NotNull(firstCookie);
 
@@ -313,7 +316,7 @@ namespace NoteEz_Server.Tests.Integration
             var client = CreateClient(factory);
             var response = await client.PostAsJsonAsync(
                 "/api/auth/password/forgot",
-                new { email = "nieistniejacy@test.local", turnstileToken = TestTurnstileToken });
+                new { email = "nieistniejacy@test.local", turnstileToken = TestTurnstileToken, consentAccepted = true });
 
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         }
@@ -327,11 +330,11 @@ namespace NoteEz_Server.Tests.Integration
             var email = EmailFor(username);
             await client.PostAsJsonAsync(
                 "/api/auth/register",
-                new { username, email, password = "OldPassword1", turnstileToken = TestTurnstileToken });
+                new { username, email, password = "OldPassword1", turnstileToken = TestTurnstileToken, consentAccepted = true });
             await VerifyEmailAsync(client, email);
 
             var forgotResponse = await client.PostAsJsonAsync(
-                "/api/auth/password/forgot", new { email, turnstileToken = TestTurnstileToken });
+                "/api/auth/password/forgot", new { email, turnstileToken = TestTurnstileToken, consentAccepted = true });
             Assert.Equal(HttpStatusCode.OK, forgotResponse.StatusCode);
 
             Assert.True(TestEmailCapture.PasswordResetLinks.TryGetValue(email, out var resetLink));
@@ -343,11 +346,11 @@ namespace NoteEz_Server.Tests.Integration
             Assert.Equal(HttpStatusCode.OK, resetResponse.StatusCode);
 
             var oldLoginResponse = await client.PostAsJsonAsync(
-                "/api/auth/login", new { username, password = "OldPassword1", turnstileToken = TestTurnstileToken });
+                "/api/auth/login", new { username, password = "OldPassword1", turnstileToken = TestTurnstileToken, consentAccepted = true });
             Assert.Equal(HttpStatusCode.Unauthorized, oldLoginResponse.StatusCode);
 
             var newLoginResponse = await client.PostAsJsonAsync(
-                "/api/auth/login", new { username, password = "NewPassword1", turnstileToken = TestTurnstileToken });
+                "/api/auth/login", new { username, password = "NewPassword1", turnstileToken = TestTurnstileToken, consentAccepted = true });
             Assert.Equal(HttpStatusCode.OK, newLoginResponse.StatusCode);
         }
 
@@ -447,7 +450,7 @@ namespace NoteEz_Server.Tests.Integration
             for (var i = 0; i < 15; i++)
             {
                 var response = await client.PostAsJsonAsync(
-                    "/api/auth/login", new { username, password = "whatever-wrong", turnstileToken = TestTurnstileToken });
+                    "/api/auth/login", new { username, password = "whatever-wrong", turnstileToken = TestTurnstileToken, consentAccepted = true });
                 lastStatus = response.StatusCode;
                 if (lastStatus == HttpStatusCode.TooManyRequests) break;
             }

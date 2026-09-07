@@ -38,6 +38,15 @@ namespace NoteEz_Server.Data
                 .HasForeignKey(a => a.NoteId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            // Postgres nie ma odpowiednika SQL Serverowego auto-generowanego "rowversion" -
+            // IsRowVersion() zakladalby, ze baza sama wypelnia te kolumne (ValueGeneratedOnAddOrUpdate),
+            // a Postgres tego nie robi, wiec insert wywalalby sie na NOT NULL. Zamiast tego aplikacja
+            // sama generuje nowa wartosc przy kazdym zapisie (patrz NoteService.NewRowVersion()).
+            modelBuilder.Entity<Note>()
+                .Property(n => n.RowVersion)
+                .IsConcurrencyToken()
+                .ValueGeneratedNever();
+
             modelBuilder.Entity<Note>()
                 .HasOne(n => n.Group)
                 .WithMany(g => g.Notes)

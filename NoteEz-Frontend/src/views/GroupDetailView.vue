@@ -180,12 +180,14 @@ onMounted(async () => {
     await groupsStore.fetchGroups()
   }
   await Promise.all([loadNotes(), loadMembers()])
-  signalr.invoke('JoinGroupChannel', groupId.value)
+  // Best-effort - jesli polaczenie akurat sie zrywa/nawiazuje (np. szybka nawigacja
+  // miedzy grupami), nie chcemy zaśmiecac konsoli unhandled rejection.
+  signalr.invoke('JoinGroupChannel', groupId.value).catch(() => {})
   signalr.on('NoteChanged', handleNoteChanged)
 })
 
 onBeforeUnmount(() => {
-  signalr.invoke('LeaveGroupChannel', groupId.value)
+  signalr.invoke('LeaveGroupChannel', groupId.value).catch(() => {})
   signalr.off('NoteChanged', handleNoteChanged)
 })
 

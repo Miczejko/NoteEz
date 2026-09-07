@@ -12,13 +12,23 @@ const router = useRouter()
 
 const open = ref(false)
 const respondingId = ref(null)
+const respondedIds = ref(new Set())
 
 function handleReceiveNotification(dto) {
   notificationsStore.handleIncoming(dto)
+  // Nowe zaproszenie przychodzace na zywo nie jest jeszcze w pendingInvites (ta lista
+  // zostala pobrana raz przy montowaniu) - bez tego przyciski Akceptuj/Odrzuc by sie nie pokazaly.
+  if (dto.type === 'GroupInvite') {
+    groupsStore.fetchPendingInvites().catch(() => {})
+  }
 }
 
 onMounted(() => {
   notificationsStore.fetchAll().catch(() => {})
+  // Zaproszenie moglo zostac juz obsluzone w innej sesji/karcie - payload powiadomienia
+  // jest zamrozony w momencie jego utworzenia i nie odzwierciedla pozniejszej zmiany
+  // statusu, wiec do ukrywania Akceptuj/Odrzuc uzywamy realnej listy oczekujacych z API.
+  groupsStore.fetchPendingInvites().catch(() => {})
   signalr.on('ReceiveNotification', handleReceiveNotification)
 })
 
@@ -60,6 +70,11 @@ function inviteId(n) {
   return n.payload?.inviteId || n.payload?.id
 }
 
+function isInvitePending(n) {
+  const id = inviteId(n)
+  return groupsStore.pendingInvites.some((i) => i.id === id)
+}
+
 async function respond(n, accept) {
   const id = inviteId(n)
   if (!id) return
@@ -67,8 +82,11 @@ async function respond(n, accept) {
   try {
     await groupsStore.respondToInvite(id, accept)
     await notificationsStore.markRead(n.id)
+    respondedIds.value = new Set(respondedIds.value).add(n.id)
   } catch {
-    /* ignore, user can retry */
+    // Zaproszenie moglo zostac juz obsluzone gdzie indziej (inna karta/sesja) - odswiezamy
+    // liste oczekujacych, zeby przycisk zniknal zamiast zostac martwy po kolejnym kliknieciu.
+    groupsStore.fetchPendingInvites().catch(() => {})
   } finally {
     respondingId.value = null
   }
@@ -126,7 +144,7 @@ function formatDate(dateStr) {
               zaprasza Cię do grupy
               <strong>{{ n.payload?.groupName || 'bez nazwy' }}</strong>
             </p>
-            <div class="notification-actions">
+            <div v-if="!respondedIds.has(n.id) && isInvitePending(n)" class="notification-actions">
               <button
                 class="btn btn-accent btn-sm"
                 :disabled="respondingId === n.id"
