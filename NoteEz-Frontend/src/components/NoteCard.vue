@@ -32,6 +32,7 @@ function formatDate(dateStr) {
       <time class="note-date">{{ formatDate(note.updatedAt) }}</time>
     </div>
     <p v-if="previewText" class="note-preview">{{ previewText }}</p>
+    <p v-if="note.groupId && note.authorUsername" class="note-author">dodane przez {{ note.authorUsername }}</p>
     <div class="note-badges">
       <span v-if="note.drawings?.length" class="badge badge-drawing"><ToolbarIcon name="drawing" /> Rysunek</span>
       <span v-if="note.audioClips?.length" class="badge badge-audio"><ToolbarIcon name="mic" /> Głosówka</span>
@@ -100,6 +101,13 @@ function formatDate(dateStr) {
   -webkit-box-orient: vertical;
   overflow: hidden;
   margin-bottom: 0.625rem;
+}
+
+.note-author {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  margin-bottom: 0.5rem;
 }
 
 .note-badges {

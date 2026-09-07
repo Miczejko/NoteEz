@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using NoteEz_Server.Data;
 using NoteEz_Server.Services;
+using NoteEz_Server.Hubs;
 using System.Text;
 using System.Threading.RateLimiting;
 using NoteEz_Server.Authentication;
@@ -49,6 +50,22 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(
             Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
     };
+
+    // Przegladarki nie moga ustawic naglowka Authorization przy WebSocket upgrade,
+    // wiec SignalR przesyla token jako query string - odczytujemy go tutaj tylko dla /hubs.
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+            {
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        }
+    };
 })
 .AddScheme<AuthenticationSchemeOptions, DeviceApiKeyHandler>(
     "DeviceApiKey", options => { });
@@ -72,6 +89,9 @@ builder.Services.AddScoped<NoteService>();
 builder.Services.AddScoped<NoteAudioService>();
 builder.Services.AddScoped<DevicePairingService>();
 builder.Services.AddScoped<EmailService>();
+builder.Services.AddScoped<GroupService>();
+builder.Services.AddScoped<NotificationService>();
+builder.Services.AddSignalR();
 builder.Services.AddHttpClient<TurnstileService>();
 builder.Services.AddSingleton(sp =>
 {
@@ -119,6 +139,20 @@ builder.Services.AddRateLimiter(options =>
             QueueLimit = 0
         });
     });
+
+    // Ogranicza spam zaproszeniami do grup - endpoint jest uwierzytelniony (JWT), wiec
+    // partycjonujemy po userId, a nie po IP.
+    options.AddPolicy("group-invites", httpContext =>
+    {
+        var partitionKey = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(10),
+            QueueLimit = 0
+        });
+    });
 });
 
 var app = builder.Build();
@@ -152,6 +186,7 @@ app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<AppHub>("/hubs/app");
 
 app.Run();
 

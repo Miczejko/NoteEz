@@ -64,6 +64,18 @@ const routes = [
     component: () => import('../views/CalendarView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/groups',
+    name: 'groups',
+    component: () => import('../views/GroupsView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/groups/:id',
+    name: 'group-detail',
+    component: () => import('../views/GroupDetailView.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({

@@ -1,9 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import api from '../api/client'
+import signalr from '../api/signalr'
 import { useNotesStore } from './notes'
 import { useCalendarNotesStore } from './calendarNotes'
 import { useDevicesStore } from './devices'
+import { useGroupsStore } from './groups'
+import { useNotificationsStore } from './notifications'
 
 export const useAuthStore = defineStore('auth', () => {
   // Token trzymany WYLACZNIE w pamieci (nie w localStorage) - localStorage jest
@@ -32,6 +35,9 @@ export const useAuthStore = defineStore('auth', () => {
     useNotesStore().$reset()
     useCalendarNotesStore().$reset()
     useDevicesStore().$reset()
+    useGroupsStore().$reset()
+    useNotificationsStore().$reset()
+    signalr.disconnect()
   }
 
   // Wolane raz przy starcie aplikacji (router guard) - probuje cicho wymienic
@@ -59,6 +65,9 @@ export const useAuthStore = defineStore('auth', () => {
   async function login(user, password, turnstileToken) {
     const { data } = await api.post('/auth/login', { username: user, password, turnstileToken })
     setSession(data.accessToken, user)
+    signalr.connect().catch(() => {
+      /* live features degradeja do zwyklego pollingu/odswiezania, brak polaczenia nie blokuje logowania */
+    })
   }
 
   async function forgotPassword(userEmail, turnstileToken) {
@@ -92,7 +101,13 @@ export const useAuthStore = defineStore('auth', () => {
   // co 30 minut (tyle zyje access token).
   async function refresh() {
     const { data } = await api.post('/auth/refresh')
+    const wasAuthenticated = isAuthenticated.value
     setSession(data.accessToken, data.username)
+    if (!wasAuthenticated) {
+      signalr.connect().catch(() => {
+        /* live features degradeja do zwyklego pollingu/odswiezania, brak polaczenia nie blokuje sesji */
+      })
+    }
     return data.accessToken
   }
 

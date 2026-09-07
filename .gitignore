@@ -24,6 +24,8 @@ docker-compose.override.yml
 .env
 .env.local
 .env.*.local
+.env.bak*
+*.env.bak*
 appsettings.Development.json
 appsettings.Local.json
 **/secrets.json

@@ -2,17 +2,27 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api from '../api/client'
 
+// Rzucany przy HTTP 409 (optimistic concurrency - ktos inny zapisal notatke
+// miedzy naszym odczytem a zapisem). Widok rozpoznaje ten blad po fladze
+// isConflict i pokazuje komunikat "odswiez" zamiast ogolnego bledu.
+export class NoteConflictError extends Error {
+  constructor(message) {
+    super(message)
+    this.isConflict = true
+  }
+}
+
 export const useNotesStore = defineStore('notes', () => {
   const notes = ref([])
   const currentNote = ref(null)
   const loading = ref(false)
   const error = ref(null)
 
-  async function fetchAll() {
+  async function fetchAll(groupId = null) {
     loading.value = true
     error.value = null
     try {
-      const { data } = await api.get('/notes')
+      const { data } = await api.get('/notes', { params: groupId ? { groupId } : {} })
       // Ensure drawings and audioClips are always arrays
       notes.value = data.map(note => ({
         ...note,
@@ -47,20 +57,30 @@ export const useNotesStore = defineStore('notes', () => {
     }
   }
 
-  async function create(title, textContent = null, scheduledDate = null, color = null) {
-    const { data } = await api.post('/notes', { title, textContent, scheduledDate, color })
+  async function create(title, textContent = null, scheduledDate = null, color = null, groupId = null) {
+    const { data } = await api.post('/notes', { title, textContent, scheduledDate, color, groupId })
     if (!scheduledDate) notes.value.unshift(data)
     return data
   }
 
   async function update(id, payload) {
-    await api.put(`/notes/${id}`, payload)
-    if (currentNote.value?.id === id) {
-      Object.assign(currentNote.value, payload)
-    }
-    const idx = notes.value.findIndex((n) => n.id === id)
-    if (idx !== -1) {
-      notes.value[idx] = { ...notes.value[idx], ...payload }
+    try {
+      const { data } = await api.put(`/notes/${id}`, payload)
+      // Backend nie zawsze zwraca cialo dla PUT - jesli zwrocil zaktualizowana notatke
+      // (np. z nowym rowVersion), scalamy ja, w przeciwnym razie tylko lokalny payload.
+      const merged = data && typeof data === 'object' ? data : payload
+      if (currentNote.value?.id === id) {
+        Object.assign(currentNote.value, merged)
+      }
+      const idx = notes.value.findIndex((n) => n.id === id)
+      if (idx !== -1) {
+        notes.value[idx] = { ...notes.value[idx], ...merged }
+      }
+    } catch (e) {
+      if (e.response?.status === 409) {
+        throw new NoteConflictError(e.response?.data?.error || 'Notatka zmieniona przez kogoś innego')
+      }
+      throw e
     }
   }
 

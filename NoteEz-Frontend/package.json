@@ -10,6 +10,7 @@
     "deploy": "wrangler deploy"
   },
   "dependencies": {
+    "@microsoft/signalr": "^10.0.11",
     "@tiptap/extension-task-item": "^3.28.0",
     "@tiptap/extension-task-list": "^3.28.0",
     "@tiptap/extension-text-style": "^3.28.0",

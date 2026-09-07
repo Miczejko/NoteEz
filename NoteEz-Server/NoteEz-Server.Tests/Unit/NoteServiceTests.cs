@@ -26,14 +26,31 @@ namespace NoteEz_Server.Tests.Unit
             return new NoteService(db, audioService);
         }
 
+        // GetByIdAsync i inne odczyty robia .Include(n => n.User) (potrzebne do AuthorUsername) -
+        // provider InMemory w odroznieniu od SQL Servera/Postgresa filtruje wyniki, gdy wymagana
+        // relacja nie ma odpowiadajacego rekordu, wiec kazdy autor notatki musi realnie istniec.
+        private static async Task<Guid> NewUserAsync(AppDbContext db)
+        {
+            var id = Guid.NewGuid();
+            db.Users.Add(new User
+            {
+                Id = id,
+                Username = "user_" + id.ToString("N")[..8],
+                Email = id + "@example.com",
+                PasswordHash = "x"
+            });
+            await db.SaveChangesAsync();
+            return id;
+        }
+
         [Fact]
         public async Task CreateAsync_PersistsNoteOwnedByCaller()
         {
             await using var db = NewDb();
             var service = NewNoteService(db);
-            var userId = Guid.NewGuid();
+            var userId = await NewUserAsync(db);
 
-            var dto = await service.CreateAsync(userId, new CreateNoteRequest("Tytul", "tresc", null, null));
+            var (dto, _) = await service.CreateAsync(userId, new CreateNoteRequest("Tytul", "tresc", null, null, null));
 
             var stored = await db.Notes.SingleAsync();
             Assert.Equal(userId, stored.UserId);
@@ -45,10 +62,10 @@ namespace NoteEz_Server.Tests.Unit
         {
             await using var db = NewDb();
             var service = NewNoteService(db);
-            var owner = Guid.NewGuid();
-            var attacker = Guid.NewGuid();
+            var owner = await NewUserAsync(db);
+            var attacker = await NewUserAsync(db);
 
-            var note = await service.CreateAsync(owner, new CreateNoteRequest("Prywatne", null, null, null));
+            var (note, _) = await service.CreateAsync(owner, new CreateNoteRequest("Prywatne", null, null, null, null));
 
             var asOwner = await service.GetByIdAsync(owner, note.Id);
             var asAttacker = await service.GetByIdAsync(attacker, note.Id);
@@ -62,14 +79,14 @@ namespace NoteEz_Server.Tests.Unit
         {
             await using var db = NewDb();
             var service = NewNoteService(db);
-            var owner = Guid.NewGuid();
-            var attacker = Guid.NewGuid();
+            var owner = await NewUserAsync(db);
+            var attacker = await NewUserAsync(db);
 
-            var note = await service.CreateAsync(owner, new CreateNoteRequest("Oryginal", null, null, null));
+            var (note, _) = await service.CreateAsync(owner, new CreateNoteRequest("Oryginal", null, null, null, null));
 
-            var updated = await service.UpdateAsync(attacker, note.Id, new UpdateNoteRequest("Zhakowane", null, null, null));
+            var (updated, _) = await service.UpdateAsync(attacker, note.Id, new UpdateNoteRequest("Zhakowane", null, null, null, null));
 
-            Assert.False(updated);
+            Assert.Null(updated);
             var stillOriginal = await service.GetByIdAsync(owner, note.Id);
             Assert.Equal("Oryginal", stillOriginal!.Title);
         }
@@ -79,10 +96,10 @@ namespace NoteEz_Server.Tests.Unit
         {
             await using var db = NewDb();
             var service = NewNoteService(db);
-            var owner = Guid.NewGuid();
-            var attacker = Guid.NewGuid();
+            var owner = await NewUserAsync(db);
+            var attacker = await NewUserAsync(db);
 
-            var note = await service.CreateAsync(owner, new CreateNoteRequest("Nie ruszaj", null, null, null));
+            var (note, _) = await service.CreateAsync(owner, new CreateNoteRequest("Nie ruszaj", null, null, null, null));
 
             var deleted = await service.DeleteAsync(attacker, note.Id);
 
@@ -95,10 +112,10 @@ namespace NoteEz_Server.Tests.Unit
         {
             await using var db = NewDb();
             var service = NewNoteService(db);
-            var owner = Guid.NewGuid();
+            var owner = await NewUserAsync(db);
 
-            var note = await service.CreateAsync(owner, new CreateNoteRequest("Cos", null, null, null));
-            await service.UpdateAsync(owner, note.Id, new UpdateNoteRequest("   ", null, null, null));
+            var (note, _) = await service.CreateAsync(owner, new CreateNoteRequest("Cos", null, null, null, null));
+            await service.UpdateAsync(owner, note.Id, new UpdateNoteRequest("   ", null, null, null, null));
 
             var result = await service.GetByIdAsync(owner, note.Id);
             Assert.Equal("Bez tytułu", result!.Title);
@@ -109,12 +126,12 @@ namespace NoteEz_Server.Tests.Unit
         {
             await using var db = NewDb();
             var service = NewNoteService(db);
-            var userA = Guid.NewGuid();
-            var userB = Guid.NewGuid();
+            var userA = await NewUserAsync(db);
+            var userB = await NewUserAsync(db);
 
-            await service.CreateAsync(userA, new CreateNoteRequest("A1", null, null, null));
-            await service.CreateAsync(userA, new CreateNoteRequest("A2", null, null, null));
-            await service.CreateAsync(userB, new CreateNoteRequest("B1", null, null, null));
+            await service.CreateAsync(userA, new CreateNoteRequest("A1", null, null, null, null));
+            await service.CreateAsync(userA, new CreateNoteRequest("A2", null, null, null, null));
+            await service.CreateAsync(userB, new CreateNoteRequest("B1", null, null, null, null));
 
             var notesForA = await service.GetAllAsync(userA);
 
@@ -127,11 +144,11 @@ namespace NoteEz_Server.Tests.Unit
         {
             await using var db = NewDb();
             var service = NewNoteService(db);
-            var owner = Guid.NewGuid();
+            var owner = await NewUserAsync(db);
             var date = new DateOnly(2026, 7, 29);
 
-            await service.CreateAsync(owner, new CreateNoteRequest("Zwykla", null, null, null));
-            await service.CreateAsync(owner, new CreateNoteRequest("Kalendarzowa", null, null, date));
+            await service.CreateAsync(owner, new CreateNoteRequest("Zwykla", null, null, null, null));
+            await service.CreateAsync(owner, new CreateNoteRequest("Kalendarzowa", null, null, date, null));
 
             var notes = await service.GetAllAsync(owner);
 
@@ -144,11 +161,11 @@ namespace NoteEz_Server.Tests.Unit
         {
             await using var db = NewDb();
             var service = NewNoteService(db);
-            var owner = Guid.NewGuid();
+            var owner = await NewUserAsync(db);
             var date = new DateOnly(2026, 7, 29);
 
-            await service.CreateAsync(owner, new CreateNoteRequest("Zwykla", null, null, null));
-            await service.CreateAsync(owner, new CreateNoteRequest("Kalendarzowa", null, null, date));
+            await service.CreateAsync(owner, new CreateNoteRequest("Zwykla", null, null, null, null));
+            await service.CreateAsync(owner, new CreateNoteRequest("Kalendarzowa", null, null, date, null));
 
             var notes = await service.GetAllLiteAsync(owner);
 
@@ -161,12 +178,12 @@ namespace NoteEz_Server.Tests.Unit
         {
             await using var db = NewDb();
             var service = NewNoteService(db);
-            var owner = Guid.NewGuid();
+            var owner = await NewUserAsync(db);
 
-            await service.CreateAsync(owner, new CreateNoteRequest("Lipiec1", null, null, new DateOnly(2026, 7, 5)));
-            await service.CreateAsync(owner, new CreateNoteRequest("Lipiec2", null, null, new DateOnly(2026, 7, 29)));
-            await service.CreateAsync(owner, new CreateNoteRequest("Sierpien", null, null, new DateOnly(2026, 8, 1)));
-            await service.CreateAsync(owner, new CreateNoteRequest("BezDaty", null, null, null));
+            await service.CreateAsync(owner, new CreateNoteRequest("Lipiec1", null, null, new DateOnly(2026, 7, 5), null));
+            await service.CreateAsync(owner, new CreateNoteRequest("Lipiec2", null, null, new DateOnly(2026, 7, 29), null));
+            await service.CreateAsync(owner, new CreateNoteRequest("Sierpien", null, null, new DateOnly(2026, 8, 1), null));
+            await service.CreateAsync(owner, new CreateNoteRequest("BezDaty", null, null, null, null));
 
             var julyNotes = await service.GetByMonthAsync(owner, 2026, 7);
 
