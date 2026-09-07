@@ -6,7 +6,7 @@
 // cookie first-party (Set-Cookie with no explicit Domain scopes to whatever
 // host the browser actually requested, i.e. noteez.online) without needing
 // a paid Azure App Service tier for a custom domain.
-const API_ORIGIN = 'https://noteez-fdd2crbzhubpgaan.germanywestcentral-01.azurewebsites.net'
+const API_ORIGIN = 'https://api.noteez.online'
 
 export default {
   async fetch(request, env) {
