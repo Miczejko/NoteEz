@@ -13,6 +13,55 @@ const groupsStore = useGroupsStore()
 const groupId = computed(() => route.query.groupId || null)
 const group = computed(() => groupsStore.groups.find((g) => g.id === groupId.value))
 
+const now = new Date()
+const viewYear = ref(now.getFullYear())
+const viewMonth = ref(now.getMonth() + 1) // 1-12
+const showAllTime = ref(false)
+
+const MONTH_NAMES = [
+  'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
+  'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień',
+]
+
+const monthLabel = computed(() => `${MONTH_NAMES[viewMonth.value - 1]} ${viewYear.value}`)
+
+function pad(n) {
+  return String(n).padStart(2, '0')
+}
+
+// Zakres dat dla wybranego miesiaca (undefined gdy "Wszystkie" - wtedy backend nie filtruje).
+const monthRange = computed(() => {
+  if (showAllTime.value) return { from: undefined, to: undefined }
+  const from = `${viewYear.value}-${pad(viewMonth.value)}-01`
+  const lastDay = new Date(viewYear.value, viewMonth.value, 0).getDate()
+  const to = `${viewYear.value}-${pad(viewMonth.value)}-${pad(lastDay)}`
+  return { from, to }
+})
+
+function prevMonth() {
+  if (viewMonth.value === 1) {
+    viewMonth.value = 12
+    viewYear.value -= 1
+  } else {
+    viewMonth.value -= 1
+  }
+}
+
+function nextMonth() {
+  if (viewMonth.value === 12) {
+    viewMonth.value = 1
+    viewYear.value += 1
+  } else {
+    viewMonth.value += 1
+  }
+}
+
+function goToCurrentMonth() {
+  viewYear.value = now.getFullYear()
+  viewMonth.value = now.getMonth() + 1
+  showAllTime.value = false
+}
+
 const showAddForm = ref(false)
 const showAddCategory = ref(false)
 const newCategoryName = ref('')
@@ -42,10 +91,19 @@ const recurringForm = ref({
 async function loadAll() {
   await Promise.all([
     budgetStore.fetchCategories(groupId.value),
-    budgetStore.fetchEntries(groupId.value),
-    budgetStore.fetchStats(groupId.value),
     budgetStore.fetchRecurring(groupId.value),
     budgetStore.fetchDueSoon(groupId.value),
+    loadMonthData(),
+  ])
+}
+
+// Cykliczne wpisy i kategorie nie zaleza od wybranego miesiaca - odswiezamy tylko
+// wpisy i statystyki, zeby przelaczanie miesiecy bylo szybkie.
+async function loadMonthData() {
+  const { from, to } = monthRange.value
+  await Promise.all([
+    budgetStore.fetchEntries(groupId.value, { from, to }),
+    budgetStore.fetchStats(groupId.value, { from, to }),
   ])
 }
 
@@ -55,6 +113,7 @@ onMounted(() => {
 })
 
 watch(groupId, loadAll)
+watch([viewYear, viewMonth, showAllTime], loadMonthData)
 
 async function handleCreateCategory() {
   if (!newCategoryName.value.trim()) return
@@ -115,7 +174,9 @@ async function handleSubmit() {
         date: form.value.date,
       })
     }
-    await budgetStore.fetchStats(groupId.value)
+    // Przeladuj z filtrem miesiaca (nie samo fetchStats bez zakresu) - nowy wpis moglby
+    // miec date spoza aktualnie ogladanego miesiaca, lokalny unshift w store tego nie wie.
+    await loadMonthData()
     pendingRecurringId.value = null
     form.value.amount = ''
     form.value.description = ''
@@ -129,7 +190,7 @@ async function handleSubmit() {
 
 async function handleDelete(entryId) {
   await budgetStore.deleteEntry(entryId)
-  await budgetStore.fetchStats(groupId.value)
+  await budgetStore.fetchStats(groupId.value, monthRange.value)
 }
 
 async function handleCreateRecurring() {
@@ -179,6 +240,17 @@ function formatDate(dateStr) {
         </div>
         <button class="btn btn-primary" @click="showAddForm ? (showAddForm = false) : openAddForm()">
           {{ showAddForm ? 'Anuluj' : '+ Dodaj wpis' }}
+        </button>
+      </div>
+
+      <div class="month-nav">
+        <button class="btn btn-ghost btn-sm" :disabled="showAllTime" @click="prevMonth" aria-label="Poprzedni miesiąc">‹</button>
+        <button class="btn btn-ghost btn-sm month-label" @click="goToCurrentMonth">
+          {{ showAllTime ? 'Wszystkie miesiące' : monthLabel }}
+        </button>
+        <button class="btn btn-ghost btn-sm" :disabled="showAllTime" @click="nextMonth" aria-label="Następny miesiąc">›</button>
+        <button class="btn btn-ghost btn-sm all-time-toggle" @click="showAllTime = !showAllTime">
+          {{ showAllTime ? 'Pokaż miesiąc' : 'Wszystkie' }}
         </button>
       </div>
 
@@ -358,6 +430,24 @@ function formatDate(dateStr) {
 .page-header h1 {
   font-size: 1.5rem;
   color: var(--color-primary);
+}
+
+.month-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.month-label {
+  font-weight: 600;
+  min-width: 160px;
+  text-align: center;
+}
+
+.all-time-toggle {
+  margin-left: auto;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
 }
 
 .due-soon-list {
