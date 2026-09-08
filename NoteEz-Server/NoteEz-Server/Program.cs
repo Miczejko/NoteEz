@@ -22,6 +22,9 @@ builder.Services.AddControllers()
         // Ensure proper JSON serialization with camelCase naming
         options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
         options.JsonSerializerOptions.WriteIndented = false;
+        // Pozwala DTO-om z polami enum (np. CreateBudgetEntryRequest.Type) przyjmowac/zwracac
+        // nazwy ("Expense") zamiast liczb - bez tego System.Text.Json oczekuje wartosci numerycznej.
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
     });
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();

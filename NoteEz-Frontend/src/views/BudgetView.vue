@@ -100,7 +100,10 @@ function formatDate(dateStr) {
     <div class="budget-page">
       <div class="page-header">
         <div class="page-header-title">
-          <router-link :to="{ name: groupId ? 'group-detail' : 'notes' }" :params="groupId ? { id: groupId } : {}" class="btn btn-ghost btn-sm back-btn">← Powrót</router-link>
+          <router-link
+            :to="groupId ? { name: 'group-detail', params: { id: groupId } } : { name: 'notes' }"
+            class="btn btn-ghost btn-sm back-btn"
+          >← Powrót</router-link>
           <h1>{{ group ? `Budżet grupy: ${group.name}` : 'Mój budżet' }}</h1>
         </div>
         <button class="btn btn-primary" @click="showAddForm = !showAddForm">
