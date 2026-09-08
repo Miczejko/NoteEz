@@ -6,7 +6,7 @@ import AppLayout from '../components/AppLayout.vue'
   <AppLayout>
     <div class="policy card">
       <h1>Polityka prywatności</h1>
-      <p class="updated">Ostatnia aktualizacja: 1 sierpnia 2026 r.</p>
+      <p class="updated">Ostatnia aktualizacja: 8 września 2026 r.</p>
 
       <section>
         <h2>1. Administrator danych</h2>
@@ -70,8 +70,11 @@ import AppLayout from '../components/AppLayout.vue'
         <p>W szczególności korzystamy z:</p>
         <ul>
           <li>
-            <strong>Microsoft Azure</strong> — hosting aplikacji, bazy danych i plików (nagrania,
-            rysunki),
+            <strong>Oracle Cloud Infrastructure</strong> — hosting aplikacji oraz bazy danych,
+          </li>
+          <li>
+            <strong>Microsoft Azure</strong> (Blob Storage) — przechowywanie plików dodanych przez
+            użytkownika (nagrania, rysunki),
           </li>
           <li>
             <strong>Cloudflare</strong> (usługa Turnstile) — ochrona formularzy logowania i
@@ -83,10 +86,11 @@ import AppLayout from '../components/AppLayout.vue'
           </li>
         </ul>
         <p>
-          Cloudflare i Resend mogą przetwarzać dane poza Europejskim Obszarem Gospodarczym
-          (m.in. w USA). Transfer ten odbywa się na podstawie standardowych klauzul umownych (SCC)
-          zatwierdzonych przez Komisję Europejską, stanowiących odpowiednie zabezpieczenie zgodnie
-          z art. 46 RODO.
+          Serwer aplikacji i baza danych (Oracle Cloud Infrastructure) znajdują się w regionie UE
+          (Frankfurt). Cloudflare i Resend mogą przetwarzać dane poza Europejskim Obszarem
+          Gospodarczym (m.in. w USA). Transfer ten odbywa się na podstawie standardowych klauzul
+          umownych (SCC) zatwierdzonych przez Komisję Europejską, stanowiących odpowiednie
+          zabezpieczenie zgodnie z art. 46 RODO.
         </p>
       </section>
 
