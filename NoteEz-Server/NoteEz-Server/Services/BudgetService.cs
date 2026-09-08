@@ -209,5 +209,125 @@ namespace NoteEz_Server.Services
 
             return new BudgetStatsDto(totalIncome, totalExpense, totalIncome - totalExpense, byCategory, byPerson);
         }
+
+        public async Task<List<RecurringBudgetEntryDto>> GetRecurringAsync(Guid userId, Guid? groupId)
+        {
+            await EnsureAccessAsync(userId, groupId);
+
+            var query = groupId is null
+                ? _db.RecurringBudgetEntries.Where(e => e.GroupId == null && e.CreatedByUserId == userId)
+                : _db.RecurringBudgetEntries.Where(e => e.GroupId == groupId);
+
+            var results = await query
+                .Where(e => e.IsActive)
+                .Include(e => e.Category)
+                .OrderBy(e => e.NextDueDate)
+                .ToListAsync();
+
+            return results.Select(ToRecurringDto).ToList();
+        }
+
+        // "Nadchodzace" - okno kilku dni do przodu, liczone przy odczycie (bez schedulera w tle).
+        public async Task<List<RecurringBudgetEntryDto>> GetDueSoonAsync(Guid userId, Guid? groupId, int daysAhead = 3)
+        {
+            await EnsureAccessAsync(userId, groupId);
+
+            var threshold = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(daysAhead);
+
+            var query = groupId is null
+                ? _db.RecurringBudgetEntries.Where(e => e.GroupId == null && e.CreatedByUserId == userId)
+                : _db.RecurringBudgetEntries.Where(e => e.GroupId == groupId);
+
+            var results = await query
+                .Where(e => e.IsActive && e.NextDueDate <= threshold)
+                .Include(e => e.Category)
+                .OrderBy(e => e.NextDueDate)
+                .ToListAsync();
+
+            return results.Select(ToRecurringDto).ToList();
+        }
+
+        public async Task<RecurringBudgetEntryDto> CreateRecurringAsync(Guid userId, CreateRecurringBudgetEntryRequest req)
+        {
+            await EnsureAccessAsync(userId, req.GroupId);
+            await EnsureCategoryBelongsAsync(req.CategoryId, req.GroupId);
+
+            var recurring = new RecurringBudgetEntry
+            {
+                Id = Guid.NewGuid(),
+                GroupId = req.GroupId,
+                CategoryId = req.CategoryId,
+                Type = req.Type,
+                Amount = req.Amount,
+                Currency = req.Currency ?? "PLN",
+                Description = req.Description,
+                CreatedByUserId = userId,
+                Frequency = req.Frequency,
+                NextDueDate = req.NextDueDate,
+                IsActive = true
+            };
+
+            _db.RecurringBudgetEntries.Add(recurring);
+            await _db.SaveChangesAsync();
+
+            await _db.Entry(recurring).Reference(e => e.Category).LoadAsync();
+            return ToRecurringDto(recurring);
+        }
+
+        public async Task DeleteRecurringAsync(Guid userId, Guid recurringId)
+        {
+            var recurring = await _db.RecurringBudgetEntries.FirstOrDefaultAsync(e => e.Id == recurringId)
+                ?? throw new KeyNotFoundException("Cykliczny wpis nie znaleziony.");
+
+            if (recurring.GroupId is null)
+            {
+                if (recurring.CreatedByUserId != userId)
+                    throw new UnauthorizedAccessException("To wpis innego użytkownika.");
+            }
+            else
+            {
+                await EnsureAccessAsync(userId, recurring.GroupId);
+            }
+
+            _db.RecurringBudgetEntries.Remove(recurring);
+            await _db.SaveChangesAsync();
+        }
+
+        // Zatwierdzenie "nadchodzacego" cyklicznego wpisu: tworzy zwykly BudgetEntry (z ewentualnie
+        // poprawionymi przez uzytkownika kwota/opisem/data) i przesuwa NextDueDate o kolejny cykl.
+        public async Task<BudgetEntryDto> ConfirmRecurringAsync(Guid userId, Guid recurringId, ConfirmRecurringBudgetEntryRequest req)
+        {
+            var recurring = await _db.RecurringBudgetEntries.FirstOrDefaultAsync(e => e.Id == recurringId)
+                ?? throw new KeyNotFoundException("Cykliczny wpis nie znaleziony.");
+
+            await EnsureAccessAsync(userId, recurring.GroupId);
+
+            var entry = new BudgetEntry
+            {
+                Id = Guid.NewGuid(),
+                GroupId = recurring.GroupId,
+                CategoryId = recurring.CategoryId,
+                Type = recurring.Type,
+                Amount = req.Amount,
+                Currency = recurring.Currency,
+                Description = req.Description,
+                CreatedByUserId = userId,
+                Date = req.Date,
+                CreatedAt = DateTime.UtcNow
+            };
+            _db.BudgetEntries.Add(entry);
+
+            recurring.NextDueDate = recurring.Frequency == RecurringFrequency.Weekly
+                ? recurring.NextDueDate.AddDays(7)
+                : recurring.NextDueDate.AddMonths(1);
+
+            await _db.SaveChangesAsync();
+
+            return await GetEntryDtoAsync(entry.Id);
+        }
+
+        private static RecurringBudgetEntryDto ToRecurringDto(RecurringBudgetEntry e) => new(
+            e.Id, e.GroupId, e.CategoryId, e.Category.Name, e.Type.ToString(),
+            e.Amount, e.Currency, e.Description, e.Frequency.ToString(), e.NextDueDate, e.IsActive);
     }
 }

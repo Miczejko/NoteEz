@@ -104,5 +104,61 @@ namespace NoteEz_Server.Controllers
             }
             catch (UnauthorizedAccessException) { return Forbid(); }
         }
+
+        [HttpGet("recurring")]
+        public async Task<IActionResult> GetRecurring([FromQuery] Guid? groupId)
+        {
+            try
+            {
+                return Ok(await _budget.GetRecurringAsync(UserId, groupId));
+            }
+            catch (UnauthorizedAccessException) { return Forbid(); }
+        }
+
+        [HttpGet("recurring/due-soon")]
+        public async Task<IActionResult> GetRecurringDueSoon([FromQuery] Guid? groupId, [FromQuery] int daysAhead = 3)
+        {
+            try
+            {
+                return Ok(await _budget.GetDueSoonAsync(UserId, groupId, daysAhead));
+            }
+            catch (UnauthorizedAccessException) { return Forbid(); }
+        }
+
+        [HttpPost("recurring")]
+        public async Task<IActionResult> CreateRecurring(CreateRecurringBudgetEntryRequest req)
+        {
+            try
+            {
+                var recurring = await _budget.CreateRecurringAsync(UserId, req);
+                return CreatedAtAction(nameof(GetRecurring), new { groupId = req.GroupId }, recurring);
+            }
+            catch (KeyNotFoundException ex) { return NotFound(new { error = ex.Message }); }
+            catch (UnauthorizedAccessException) { return Forbid(); }
+            catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+        }
+
+        [HttpDelete("recurring/{id}")]
+        public async Task<IActionResult> DeleteRecurring(Guid id)
+        {
+            try
+            {
+                await _budget.DeleteRecurringAsync(UserId, id);
+                return NoContent();
+            }
+            catch (KeyNotFoundException) { return NotFound(); }
+            catch (UnauthorizedAccessException) { return Forbid(); }
+        }
+
+        [HttpPost("recurring/{id}/confirm")]
+        public async Task<IActionResult> ConfirmRecurring(Guid id, ConfirmRecurringBudgetEntryRequest req)
+        {
+            try
+            {
+                return Ok(await _budget.ConfirmRecurringAsync(UserId, id, req));
+            }
+            catch (KeyNotFoundException ex) { return NotFound(new { error = ex.Message }); }
+            catch (UnauthorizedAccessException) { return Forbid(); }
+        }
     }
 }

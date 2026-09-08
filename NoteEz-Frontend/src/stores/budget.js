@@ -6,6 +6,8 @@ export const useBudgetStore = defineStore('budget', () => {
   const categories = ref([])
   const entries = ref([])
   const stats = ref(null)
+  const recurring = ref([])
+  const dueSoon = ref([])
   const loading = ref(false)
   const error = ref(null)
 
@@ -82,10 +84,54 @@ export const useBudgetStore = defineStore('budget', () => {
     return data
   }
 
+  async function fetchRecurring(groupId) {
+    const { data } = await api.get('/budget/recurring', { params: groupParam(groupId) })
+    recurring.value = data
+    return data
+  }
+
+  async function fetchDueSoon(groupId, daysAhead = 3) {
+    const { data } = await api.get('/budget/recurring/due-soon', {
+      params: { ...groupParam(groupId), daysAhead },
+    })
+    dueSoon.value = data
+    return data
+  }
+
+  async function createRecurring(groupId, { categoryId, type, amount, currency, description, frequency, nextDueDate }) {
+    const { data } = await api.post('/budget/recurring', {
+      groupId,
+      categoryId,
+      type,
+      amount,
+      currency,
+      description,
+      frequency,
+      nextDueDate,
+    })
+    recurring.value.push(data)
+    return data
+  }
+
+  async function deleteRecurring(recurringId) {
+    await api.delete(`/budget/recurring/${recurringId}`)
+    recurring.value = recurring.value.filter((r) => r.id !== recurringId)
+    dueSoon.value = dueSoon.value.filter((r) => r.id !== recurringId)
+  }
+
+  async function confirmRecurring(recurringId, { amount, description, date }) {
+    const { data } = await api.post(`/budget/recurring/${recurringId}/confirm`, { amount, description, date })
+    entries.value.unshift(data)
+    dueSoon.value = dueSoon.value.filter((r) => r.id !== recurringId)
+    return data
+  }
+
   function $reset() {
     categories.value = []
     entries.value = []
     stats.value = null
+    recurring.value = []
+    dueSoon.value = []
     loading.value = false
     error.value = null
   }
@@ -94,6 +140,8 @@ export const useBudgetStore = defineStore('budget', () => {
     categories,
     entries,
     stats,
+    recurring,
+    dueSoon,
     loading,
     error,
     fetchCategories,
@@ -103,6 +151,11 @@ export const useBudgetStore = defineStore('budget', () => {
     updateEntry,
     deleteEntry,
     fetchStats,
+    fetchRecurring,
+    fetchDueSoon,
+    createRecurring,
+    deleteRecurring,
+    confirmRecurring,
     $reset,
   }
 })

@@ -25,6 +25,7 @@ namespace NoteEz_Server.Data
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<BudgetCategory> BudgetCategories { get; set; }
         public DbSet<BudgetEntry> BudgetEntries { get; set; }
+        public DbSet<RecurringBudgetEntry> RecurringBudgetEntries { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -110,6 +111,24 @@ namespace NoteEz_Server.Data
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<BudgetEntry>()
+                .HasOne(e => e.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<RecurringBudgetEntry>()
+                .HasOne(e => e.Group)
+                .WithMany()
+                .HasForeignKey(e => e.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<RecurringBudgetEntry>()
+                .HasOne(e => e.Category)
+                .WithMany()
+                .HasForeignKey(e => e.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<RecurringBudgetEntry>()
                 .HasOne(e => e.CreatedByUser)
                 .WithMany()
                 .HasForeignKey(e => e.CreatedByUserId)

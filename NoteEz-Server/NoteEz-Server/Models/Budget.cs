@@ -41,6 +41,32 @@ namespace NoteEz_Server.Models
         public User CreatedByUser { get; set; }
     }
 
+    public enum RecurringFrequency
+    {
+        Weekly,
+        Monthly
+    }
+
+    public class RecurringBudgetEntry
+    {
+        [Key]
+        public Guid Id { get; set; }
+        public Guid? GroupId { get; set; } // null = cykliczny wpis osobisty
+        public Guid CategoryId { get; set; }
+        public BudgetEntryType Type { get; set; }
+        public decimal Amount { get; set; }
+        public string Currency { get; set; } = "PLN";
+        public string? Description { get; set; }
+        public Guid CreatedByUserId { get; set; }
+        public RecurringFrequency Frequency { get; set; }
+        public DateOnly NextDueDate { get; set; }
+        public bool IsActive { get; set; } = true;
+
+        public Group? Group { get; set; }
+        public BudgetCategory Category { get; set; }
+        public User CreatedByUser { get; set; }
+    }
+
     public record BudgetCategoryDto(Guid Id, string Name, string Icon, string Color);
 
     public record BudgetEntryDto(
@@ -55,6 +81,19 @@ namespace NoteEz_Server.Models
         Guid CreatedByUserId,
         string CreatedByUsername,
         DateOnly Date);
+
+    public record RecurringBudgetEntryDto(
+        Guid Id,
+        Guid? GroupId,
+        Guid CategoryId,
+        string CategoryName,
+        string Type,
+        decimal Amount,
+        string Currency,
+        string? Description,
+        string Frequency,
+        DateOnly NextDueDate,
+        bool IsActive);
 
     public record BudgetCategoryStatDto(Guid CategoryId, string CategoryName, decimal TotalIncome, decimal TotalExpense);
 
@@ -105,4 +144,28 @@ namespace NoteEz_Server.Models
         [Required]
         DateOnly Date);
 
+    public record CreateRecurringBudgetEntryRequest(
+        Guid? GroupId,
+        [Required]
+        Guid CategoryId,
+        [Required]
+        BudgetEntryType Type,
+        [Range(0.01, 100_000_000)]
+        decimal Amount,
+        [StringLength(3, MinimumLength = 3)]
+        string? Currency,
+        [StringLength(500)]
+        string? Description,
+        [Required]
+        RecurringFrequency Frequency,
+        [Required]
+        DateOnly NextDueDate);
+
+    public record ConfirmRecurringBudgetEntryRequest(
+        [Range(0.01, 100_000_000)]
+        decimal Amount,
+        [StringLength(500)]
+        string? Description,
+        [Required]
+        DateOnly Date);
 }
