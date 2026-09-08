@@ -274,6 +274,9 @@ function formatDate(dateStr) {
           <router-link :to="{ name: 'groups' }" class="btn btn-ghost btn-sm back-btn">← Grupy</router-link>
           <h1>{{ group?.name || 'Grupa' }}</h1>
         </div>
+        <router-link :to="{ name: 'budget', query: { groupId } }" class="btn btn-ghost btn-sm">
+          Budżet grupy
+        </router-link>
       </div>
 
       <div class="tabs">

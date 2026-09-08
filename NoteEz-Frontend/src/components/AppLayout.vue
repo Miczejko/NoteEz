@@ -29,6 +29,16 @@ const auth = useAuthStore()
           <ToolbarIcon name="users" :size="20" />
           <span class="groups-label">Grupy</span>
         </router-link>
+        <router-link
+          v-if="auth.isAuthenticated"
+          :to="{ name: 'budget' }"
+          class="btn groups-link"
+          aria-label="Budżet"
+          title="Budżet"
+        >
+          <ToolbarIcon name="wallet" :size="20" />
+          <span class="groups-label">Budżet</span>
+        </router-link>
         <NotificationBell v-if="auth.isAuthenticated" />
         <router-link
           v-if="auth.isAuthenticated"

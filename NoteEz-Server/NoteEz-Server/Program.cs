@@ -91,6 +91,7 @@ builder.Services.AddScoped<DevicePairingService>();
 builder.Services.AddHttpClient<EmailService>();
 builder.Services.AddScoped<GroupService>();
 builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<BudgetService>();
 builder.Services.AddSignalR();
 builder.Services.AddHttpClient<TurnstileService>();
 builder.Services.AddSingleton(sp =>

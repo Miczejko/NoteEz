@@ -128,6 +128,11 @@ defineProps({
       <circle cx="14" cy="7.5" r="2.1" />
       <path d="M12.8 11.7c1.9.3 3.2 1.7 3.2 4" />
     </template>
+    <template v-else-if="name === 'wallet'">
+      <rect x="3" y="5.5" width="14" height="10" rx="2" />
+      <path d="M3 8.5h14" />
+      <circle cx="13.5" cy="11.5" r="1" fill="currentColor" stroke="none" />
+    </template>
     <template v-else-if="name === 'bell'">
       <path d="M6 8a4 4 0 0 1 8 0c0 3.5 1.2 4.5 1.2 4.5H4.8S6 11.5 6 8Z" />
       <path d="M8.5 15a1.5 1.5 0 0 0 3 0" />

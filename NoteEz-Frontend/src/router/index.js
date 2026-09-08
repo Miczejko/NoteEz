@@ -76,6 +76,12 @@ const routes = [
     component: () => import('../views/GroupDetailView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/budget',
+    name: 'budget',
+    component: () => import('../views/BudgetView.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({

@@ -23,6 +23,8 @@ namespace NoteEz_Server.Data
         public DbSet<GroupMember> GroupMembers { get; set; }
         public DbSet<GroupInvite> GroupInvites { get; set; }
         public DbSet<Notification> Notifications { get; set; }
+        public DbSet<BudgetCategory> BudgetCategories { get; set; }
+        public DbSet<BudgetEntry> BudgetEntries { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -80,6 +82,38 @@ namespace NoteEz_Server.Data
                 .WithMany()
                 .HasForeignKey(i => i.InvitedUserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<BudgetCategory>()
+                .HasOne(c => c.Group)
+                .WithMany()
+                .HasForeignKey(c => c.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<BudgetCategory>()
+                .HasOne(c => c.User)
+                .WithMany()
+                .HasForeignKey(c => c.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<BudgetEntry>()
+                .HasOne(e => e.Group)
+                .WithMany()
+                .HasForeignKey(e => e.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Restrict (nie Cascade) - unika konfliktu wielu sciezek kaskadowych z Group
+            // (Group -> BudgetCategory -> BudgetEntry i Group -> BudgetEntry jednoczesnie).
+            modelBuilder.Entity<BudgetEntry>()
+                .HasOne(e => e.Category)
+                .WithMany()
+                .HasForeignKey(e => e.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<BudgetEntry>()
+                .HasOne(e => e.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
 
     }

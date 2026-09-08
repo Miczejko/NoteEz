@@ -7,6 +7,7 @@ import { useCalendarNotesStore } from './calendarNotes'
 import { useDevicesStore } from './devices'
 import { useGroupsStore } from './groups'
 import { useNotificationsStore } from './notifications'
+import { useBudgetStore } from './budget'
 
 export const useAuthStore = defineStore('auth', () => {
   // Token trzymany WYLACZNIE w pamieci (nie w localStorage) - localStorage jest
@@ -37,6 +38,7 @@ export const useAuthStore = defineStore('auth', () => {
     useDevicesStore().$reset()
     useGroupsStore().$reset()
     useNotificationsStore().$reset()
+    useBudgetStore().$reset()
     signalr.disconnect()
   }
 
