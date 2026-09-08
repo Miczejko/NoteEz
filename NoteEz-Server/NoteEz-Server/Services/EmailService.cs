@@ -1,15 +1,21 @@
-using SendGrid;
-using SendGrid.Helpers.Mail;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 
 namespace NoteEz_Server.Services
 {
     public class EmailService
     {
+        private readonly HttpClient _httpClient;
         private readonly IConfiguration _config;
 
-        public EmailService(IConfiguration config)
+        public EmailService(HttpClient httpClient, IConfiguration config)
         {
+            _httpClient = httpClient;
             _config = config;
+
+            _httpClient.BaseAddress ??= new Uri("https://api.resend.com/");
+            _httpClient.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", _config["Resend:ApiKey"]);
         }
 
         public virtual Task SendVerificationEmailAsync(string toEmail, string verificationLink)
@@ -38,14 +44,6 @@ namespace NoteEz_Server.Services
 
         public virtual async Task SendRegistrationAttemptOnExistingAccountEmailAsync(string toEmail)
         {
-            var apiKey = _config["SendGrid:ApiKey"];
-            var fromEmail = _config["SendGrid:FromEmail"];
-            var fromName = _config["SendGrid:FromName"] ?? "NoteEz";
-
-            var client = new SendGridClient(apiKey);
-            var from = new EmailAddress(fromEmail, fromName);
-            var to = new EmailAddress(toEmail);
-
             var text = "Ktoś próbował założyć konto NoteEz używając Twojego adresu e-mail, ale masz już u nas konto. " +
                        "Jeśli to byłeś/aś Ty, po prostu się zaloguj. Jeśli zapomniałeś/aś hasła, skorzystaj z opcji " +
                        "\"Nie pamiętam hasła\" na stronie logowania. Jeśli to nie Ty, zignoruj tę wiadomość.";
@@ -56,30 +54,12 @@ namespace NoteEz_Server.Services
                 </div>
                 """;
 
-            var msg = MailHelper.CreateSingleEmail(
-                from, to, "Próba założenia konta - NoteEz",
-                plainTextContent: text,
-                htmlContent: htmlContent);
-
-            var response = await client.SendEmailAsync(msg);
-            if ((int)response.StatusCode >= 400)
-            {
-                var body = await response.Body.ReadAsStringAsync();
-                throw new InvalidOperationException($"SendGrid error {response.StatusCode}: {body}");
-            }
+            await SendEmailAsync(toEmail, "Próba założenia konta - NoteEz", text, htmlContent);
         }
 
-        private async Task SendButtonEmailAsync(
+        private Task SendButtonEmailAsync(
             string toEmail, string subject, string heading, string bodyHtml, string buttonText, string link, string footnote)
         {
-            var apiKey = _config["SendGrid:ApiKey"];
-            var fromEmail = _config["SendGrid:FromEmail"];
-            var fromName = _config["SendGrid:FromName"] ?? "NoteEz";
-
-            var client = new SendGridClient(apiKey);
-            var from = new EmailAddress(fromEmail, fromName);
-            var to = new EmailAddress(toEmail);
-
             var htmlContent = $"""
                 <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 480px; margin: 0 auto;">
                   <p>{heading}</p>
@@ -99,16 +79,28 @@ namespace NoteEz_Server.Services
                 </div>
                 """;
 
-            var msg = MailHelper.CreateSingleEmail(
-                from, to, subject,
-                plainTextContent: $"{bodyHtml} {buttonText}: {link}",
-                htmlContent: htmlContent);
+            return SendEmailAsync(toEmail, subject, $"{bodyHtml} {buttonText}: {link}", htmlContent);
+        }
 
-            var response = await client.SendEmailAsync(msg);
-            if ((int)response.StatusCode >= 400)
+        private async Task SendEmailAsync(string toEmail, string subject, string text, string html)
+        {
+            var fromEmail = _config["Resend:FromEmail"];
+            var fromName = _config["Resend:FromName"] ?? "NoteEz";
+
+            var payload = new
             {
-                var body = await response.Body.ReadAsStringAsync();
-                throw new InvalidOperationException($"SendGrid error {response.StatusCode}: {body}");
+                from = $"{fromName} <{fromEmail}>",
+                to = new[] { toEmail },
+                subject,
+                text,
+                html
+            };
+
+            var response = await _httpClient.PostAsJsonAsync("emails", payload);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                throw new InvalidOperationException($"Resend error {response.StatusCode}: {body}");
             }
         }
     }

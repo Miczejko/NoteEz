@@ -4,12 +4,12 @@ using NoteEz_Server.Services;
 
 namespace NoteEz_Server.Tests.Integration
 {
-    // Podmienia prawdziwe wysylanie maili (SendGrid) w testach - zamiast tego zapisuje
+    // Podmienia prawdziwe wysylanie maili (Resend) w testach - zamiast tego zapisuje
     // linki z maili do statycznych slownikow, zeby testy mogly je odczytac (np. zeby
     // "kliknac" link weryfikacyjny bez prawdziwej skrzynki pocztowej).
     public class FakeEmailService : EmailService
     {
-        public FakeEmailService(IConfiguration config) : base(config)
+        public FakeEmailService(HttpClient httpClient, IConfiguration config) : base(httpClient, config)
         {
         }
 

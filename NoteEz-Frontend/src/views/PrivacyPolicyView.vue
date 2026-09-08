@@ -78,12 +78,12 @@ import AppLayout from '../components/AppLayout.vue'
             rejestracji przed botami; przetwarza adres IP i dane techniczne przeglądarki,
           </li>
           <li>
-            <strong>Twilio SendGrid</strong> — wysyłka e-maili transakcyjnych (weryfikacja konta,
+            <strong>Resend</strong> — wysyłka e-maili transakcyjnych (weryfikacja konta,
             reset hasła).
           </li>
         </ul>
         <p>
-          Cloudflare i Twilio SendGrid mogą przetwarzać dane poza Europejskim Obszarem Gospodarczym
+          Cloudflare i Resend mogą przetwarzać dane poza Europejskim Obszarem Gospodarczym
           (m.in. w USA). Transfer ten odbywa się na podstawie standardowych klauzul umownych (SCC)
           zatwierdzonych przez Komisję Europejską, stanowiących odpowiednie zabezpieczenie zgodnie
           z art. 46 RODO.

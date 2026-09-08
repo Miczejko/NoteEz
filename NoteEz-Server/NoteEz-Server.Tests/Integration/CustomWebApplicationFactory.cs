@@ -46,10 +46,10 @@ namespace NoteEz_Server.Tests.Integration
                 services.AddSingleton(_ =>
                     new BlobServiceClient("UseDevelopmentStorage=true").GetBlobContainerClient("test-audio"));
 
-                // Prawdziwy EmailService (SendGrid) wymagalby sieci i prawdziwego API key -
+                // Prawdziwy EmailService (Resend) wymagalby sieci i prawdziwego API key -
                 // podmieniamy na fake, ktory zapisuje linki z maili do TestEmailCapture.
                 services.RemoveAll<EmailService>();
-                services.AddScoped<EmailService, FakeEmailService>();
+                services.AddHttpClient<EmailService, FakeEmailService>();
 
                 // Prawdziwy TurnstileService wywolywalby siec (Cloudflare /siteverify) -
                 // podmieniamy na fake, ktory akceptuje kazdy niepusty token.

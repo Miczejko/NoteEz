@@ -88,7 +88,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<NoteService>();
 builder.Services.AddScoped<NoteAudioService>();
 builder.Services.AddScoped<DevicePairingService>();
-builder.Services.AddScoped<EmailService>();
+builder.Services.AddHttpClient<EmailService>();
 builder.Services.AddScoped<GroupService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddSignalR();

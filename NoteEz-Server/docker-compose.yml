@@ -34,9 +34,9 @@ services:
       - BlobStorage__ContainerName=${AZURE_BLOB_CONTAINER_NAME}
       - Cors__AllowedOrigins__0=${CORS_ALLOWED_ORIGIN:-http://localhost:5173}
       - Cors__AllowedOrigins__1=${CORS_ALLOWED_ORIGIN_LAN:-http://localhost:5173}
-      - SendGrid__ApiKey=${MAIL_KEY}
-      - SendGrid__FromEmail=${MAIL_FROM_EMAIL}
-      - SendGrid__FromName=${MAIL_FROM_NAME:-NoteEz}
+      - Resend__ApiKey=${MAIL_KEY}
+      - Resend__FromEmail=${MAIL_FROM_EMAIL}
+      - Resend__FromName=${MAIL_FROM_NAME:-NoteEz}
       - App__FrontendBaseUrl=${CORS_ALLOWED_ORIGIN:-http://localhost:5173}
       - App__BackendBaseUrl=${BACKEND_BASE_URL:-http://localhost:8080}
       - Turnstile__SecretKey=${TURNSTILE_SECRET_KEY:-1x0000000000000000000000000000000AA}
