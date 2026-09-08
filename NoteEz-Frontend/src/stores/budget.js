@@ -119,6 +119,15 @@ export const useBudgetStore = defineStore('budget', () => {
     dueSoon.value = dueSoon.value.filter((r) => r.id !== recurringId)
   }
 
+  async function scanReceipt(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const { data } = await api.post('/budget/receipts/scan', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data
+  }
+
   async function confirmRecurring(recurringId, { amount, description, date }) {
     const { data } = await api.post(`/budget/recurring/${recurringId}/confirm`, { amount, description, date })
     entries.value.unshift(data)
@@ -156,6 +165,7 @@ export const useBudgetStore = defineStore('budget', () => {
     createRecurring,
     deleteRecurring,
     confirmRecurring,
+    scanReceipt,
     $reset,
   }
 })

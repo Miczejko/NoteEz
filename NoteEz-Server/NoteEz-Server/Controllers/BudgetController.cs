@@ -12,10 +12,14 @@ namespace NoteEz_Server.Controllers
     public class BudgetController : ControllerBase
     {
         private readonly BudgetService _budget;
+        private readonly ReceiptScanService _receiptScan;
 
-        public BudgetController(BudgetService budget)
+        private const long MaxReceiptImageSizeBytes = 8_000_000; // ~8MB - zdjecie z telefonu, nie skan w 4K
+
+        public BudgetController(BudgetService budget, ReceiptScanService receiptScan)
         {
             _budget = budget;
+            _receiptScan = receiptScan;
         }
 
         private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -148,6 +152,39 @@ namespace NoteEz_Server.Controllers
             }
             catch (KeyNotFoundException) { return NotFound(); }
             catch (UnauthorizedAccessException) { return Forbid(); }
+        }
+
+        [HttpPost("receipts/scan")]
+        [RequestSizeLimit(MaxReceiptImageSizeBytes)]
+        public async Task<IActionResult> ScanReceipt(IFormFile file)
+        {
+            if (file is null || file.Length == 0)
+                return BadRequest(new { error = "Brak zdjęcia paragonu." });
+
+            if (file.Length > MaxReceiptImageSizeBytes)
+                return BadRequest(new { error = "Zdjęcie jest za duże." });
+
+            await using var stream = file.OpenReadStream();
+            var header = new byte[ImageSignatureValidator.RequiredHeaderBytes];
+            var read = await stream.ReadAsync(header.AsMemory(0, header.Length));
+            stream.Position = 0;
+
+            var mediaType = ImageSignatureValidator.DetectMediaType(header.AsSpan(0, read));
+            if (mediaType is null)
+                return BadRequest(new { error = "Nieobsługiwany format zdjęcia (dozwolone: JPEG, PNG, WebP)." });
+
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+
+            try
+            {
+                var result = await _receiptScan.ScanAsync(ms.ToArray(), mediaType);
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
         }
 
         [HttpPost("recurring/{id}/confirm")]

@@ -82,14 +82,19 @@ import AppLayout from '../components/AppLayout.vue'
           </li>
           <li>
             <strong>Resend</strong> — wysyłka e-maili transakcyjnych (weryfikacja konta,
-            reset hasła).
+            reset hasła),
+          </li>
+          <li>
+            <strong>Anthropic</strong> — jeśli skorzystasz z funkcji skanowania paragonu w module
+            budżetu, zdjęcie paragonu jest przesyłane do Anthropic w celu automatycznego odczytania
+            pozycji zakupowych; zdjęcie nie jest przez nas trwale zapisywane ani przechowywane.
           </li>
         </ul>
         <p>
           Serwer aplikacji i baza danych (Oracle Cloud Infrastructure) znajdują się w regionie UE
-          (Frankfurt). Cloudflare i Resend mogą przetwarzać dane poza Europejskim Obszarem
-          Gospodarczym (m.in. w USA). Transfer ten odbywa się na podstawie standardowych klauzul
-          umownych (SCC) zatwierdzonych przez Komisję Europejską, stanowiących odpowiednie
+          (Frankfurt). Cloudflare, Resend i Anthropic mogą przetwarzać dane poza Europejskim
+          Obszarem Gospodarczym (m.in. w USA). Transfer ten odbywa się na podstawie standardowych
+          klauzul umownych (SCC) zatwierdzonych przez Komisję Europejską, stanowiących odpowiednie
           zabezpieczenie zgodnie z art. 46 RODO.
         </p>
       </section>

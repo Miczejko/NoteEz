@@ -161,6 +161,18 @@ namespace NoteEz_Server.Models
         [Required]
         DateOnly NextDueDate);
 
+    public record ReceiptScanItemDto(string Name, decimal? Quantity, decimal? UnitPrice, decimal? TotalPrice);
+
+    public record ReceiptScanResultDto(
+        string? Merchant,
+        DateOnly? Date,
+        string? Currency,
+        IReadOnlyList<ReceiptScanItemDto> Items,
+        decimal? Total,
+        // true, gdy suma pozycji nie zgadza sie z odczytana suma paragonu (w granicach tolerancji) -
+        // sygnal dla frontendu, zeby pokazac ostrzezenie "sprawdz kwoty" zamiast ufac im w ciemno.
+        bool AmountsMismatch);
+
     public record ConfirmRecurringBudgetEntryRequest(
         [Range(0.01, 100_000_000)]
         decimal Amount,

@@ -13,6 +13,70 @@ const groupsStore = useGroupsStore()
 const groupId = computed(() => route.query.groupId || null)
 const group = computed(() => groupsStore.groups.find((g) => g.id === groupId.value))
 
+const receiptFileInput = ref(null)
+const scanning = ref(false)
+const scanError = ref(null)
+const scanResult = ref(null) // ReceiptScanResultDto z backendu, dopoki uzytkownik nie zatwierdzi/odrzuci
+const scanItems = ref([]) // [{ checked, name, amount }] - edytowalna kopia scanResult.items
+const scanCategoryId = ref('')
+const scanSubmitting = ref(false)
+
+function openReceiptPicker() {
+  receiptFileInput.value?.click()
+}
+
+async function handleReceiptSelected(event) {
+  const file = event.target.files?.[0]
+  event.target.value = '' // pozwala wybrac ten sam plik ponownie
+  if (!file) return
+
+  scanning.value = true
+  scanError.value = null
+  try {
+    const result = await budgetStore.scanReceipt(file)
+    scanResult.value = result
+    scanItems.value = result.items.map((i) => ({
+      checked: true,
+      name: i.name,
+      amount: i.totalPrice ?? (i.unitPrice && i.quantity ? i.unitPrice * i.quantity : ''),
+    }))
+    scanCategoryId.value = ''
+  } catch (e) {
+    scanError.value = e.response?.data?.error || 'Nie udało się odczytać paragonu.'
+  } finally {
+    scanning.value = false
+  }
+}
+
+function closeScanPanel() {
+  scanResult.value = null
+  scanItems.value = []
+  scanError.value = null
+}
+
+async function handleAddScannedItems() {
+  const toAdd = scanItems.value.filter((i) => i.checked && i.amount && Number(i.amount) > 0)
+  if (!scanCategoryId.value || !toAdd.length) return
+
+  scanSubmitting.value = true
+  try {
+    const date = scanResult.value?.date || new Date().toISOString().slice(0, 10)
+    for (const item of toAdd) {
+      await budgetStore.createEntry(groupId.value, {
+        categoryId: scanCategoryId.value,
+        type: 'Expense',
+        amount: Number(item.amount),
+        description: item.name,
+        date,
+      })
+    }
+    await loadMonthData()
+    closeScanPanel()
+  } finally {
+    scanSubmitting.value = false
+  }
+}
+
 const now = new Date()
 const viewYear = ref(now.getFullYear())
 const viewMonth = ref(now.getMonth() + 1) // 1-12
@@ -238,9 +302,50 @@ function formatDate(dateStr) {
           >← Powrót</router-link>
           <h1>{{ group ? `Budżet grupy: ${group.name}` : 'Mój budżet' }}</h1>
         </div>
-        <button class="btn btn-primary" @click="showAddForm ? (showAddForm = false) : openAddForm()">
-          {{ showAddForm ? 'Anuluj' : '+ Dodaj wpis' }}
-        </button>
+        <div class="page-header-actions">
+          <input
+            ref="receiptFileInput"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            hidden
+            @change="handleReceiptSelected"
+          />
+          <button class="btn btn-ghost" :disabled="scanning" @click="openReceiptPicker">
+            {{ scanning ? 'Skanowanie…' : '📷 Skanuj paragon' }}
+          </button>
+          <button class="btn btn-primary" @click="showAddForm ? (showAddForm = false) : openAddForm()">
+            {{ showAddForm ? 'Anuluj' : '+ Dodaj wpis' }}
+          </button>
+        </div>
+      </div>
+
+      <p v-if="scanError" class="state-msg error-msg">{{ scanError }}</p>
+
+      <div v-if="scanResult" class="add-form card scan-result">
+        <h3>Wynik skanowania paragonu{{ scanResult.merchant ? ` - ${scanResult.merchant}` : '' }}</h3>
+        <p v-if="scanResult.amountsMismatch" class="state-msg error-msg">
+          Suma pozycji nie zgadza się z sumą na paragonie - sprawdź kwoty przed dodaniem.
+        </p>
+
+        <select v-model="scanCategoryId" class="input-field">
+          <option value="" disabled>Wybierz kategorię dla wszystkich pozycji…</option>
+          <option v-for="c in budgetStore.categories" :key="c.id" :value="c.id">{{ c.name }}</option>
+        </select>
+
+        <ul class="scan-items-list">
+          <li v-for="(item, idx) in scanItems" :key="idx" class="scan-item-row">
+            <input type="checkbox" v-model="item.checked" />
+            <input v-model="item.name" type="text" class="input-field" placeholder="Nazwa pozycji" />
+            <input v-model="item.amount" type="number" min="0" step="0.01" class="input-field scan-amount" placeholder="Kwota" />
+          </li>
+        </ul>
+
+        <div class="form-row">
+          <button class="btn btn-accent" :disabled="scanSubmitting || !scanCategoryId" @click="handleAddScannedItems">
+            {{ scanSubmitting ? 'Dodawanie…' : 'Dodaj zaznaczone pozycje' }}
+          </button>
+          <button class="btn btn-ghost" @click="closeScanPanel">Anuluj</button>
+        </div>
       </div>
 
       <div class="month-nav">
@@ -430,6 +535,42 @@ function formatDate(dateStr) {
 .page-header h1 {
   font-size: 1.5rem;
   color: var(--color-primary);
+}
+
+.page-header-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.scan-result h3 {
+  font-size: 1rem;
+  color: var(--color-primary);
+  margin: 0;
+}
+
+.scan-items-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0;
+  margin: 0;
+}
+
+.scan-item-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.scan-item-row .input-field {
+  flex: 1;
+}
+
+.scan-amount {
+  max-width: 120px;
+  flex: 0 0 auto !important;
 }
 
 .month-nav {
