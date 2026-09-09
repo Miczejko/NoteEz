@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using NoteEz_Server.Models;
 using NoteEz_Server.Services;
 using System.Security.Claims;
@@ -156,6 +157,7 @@ namespace NoteEz_Server.Controllers
 
         [HttpPost("receipts/scan")]
         [RequestSizeLimit(MaxReceiptImageSizeBytes)]
+        [EnableRateLimiting("scan-receipt")]
         public async Task<IActionResult> ScanReceipt(IFormFile file)
         {
             if (file is null || file.Length == 0)

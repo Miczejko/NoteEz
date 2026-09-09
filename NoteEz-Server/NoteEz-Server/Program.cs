@@ -158,6 +158,18 @@ builder.Services.AddRateLimiter(options =>
             QueueLimit = 0
         });
     });
+
+    options.AddPolicy("scan-receipt", httpContext =>
+    {
+        var partitionKey = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromMinutes(10),
+            QueueLimit = 0
+        });
+    });
 });
 
 var app = builder.Build();
