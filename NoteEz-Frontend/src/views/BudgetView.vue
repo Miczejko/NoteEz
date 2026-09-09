@@ -331,7 +331,16 @@ function formatDate(dateStr) {
         <option v-for="c in budgetStore.categories" :key="c.id" :value="c.name" />
       </datalist>
 
-      <div v-if="scanResult" class="add-form card scan-result">
+      <div v-if="scanResult && !scanItems.length" class="add-form card scan-result">
+        <h3>Wynik skanowania paragonu</h3>
+        <p class="state-msg error-msg">
+          Nie udało się rozpoznać żadnych pozycji na zdjęciu - upewnij się, że to wyraźne zdjęcie
+          całego paragonu i spróbuj ponownie.
+        </p>
+        <button class="btn btn-ghost" @click="closeScanPanel">Zamknij</button>
+      </div>
+
+      <div v-else-if="scanResult" class="add-form card scan-result">
         <h3>Wynik skanowania paragonu{{ scanResult.merchant ? ` - ${scanResult.merchant}` : '' }}</h3>
         <p v-if="scanResult.amountsMismatch" class="state-msg error-msg">
           Suma pozycji nie zgadza się z sumą na paragonie - sprawdź kwoty przed dodaniem.
