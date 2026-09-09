@@ -66,11 +66,13 @@ namespace NoteEz_Server.Services
 
             var response = await _client.Messages.Create(new MessageCreateParams
             {
-                Model = "claude-opus-5",
+                // Haiku 4.5 zamiast Opus 5 - proste odczytanie paragonu (strukturalna ekstrakcja
+                // z wyraznego zdjecia) nie wymaga najdrozszego modelu; ~5x tansze per token.
+                // Uwaga: Haiku 4.5 nie wspiera OutputConfig.Effort (zwraca blad), wiec go pomijamy.
+                Model = "claude-haiku-4-5",
                 MaxTokens = 2048,
                 OutputConfig = new OutputConfig
                 {
-                    Effort = Effort.Low,
                     Format = new JsonOutputFormat { Schema = schema },
                 },
                 Messages =
