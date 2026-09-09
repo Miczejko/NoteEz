@@ -85,10 +85,16 @@ namespace NoteEz_Server.Services
                             new ImageBlockParam { Source = new Base64ImageSource { MediaType = mediaType, Data = base64Data } },
                             new TextBlockParam
                             {
-                                Text = "To zdjecie paragonu ze sklepu. Wypisz z niego dane sprzedawcy, date, " +
-                                       "waluty oraz liste pozycji (nazwa, ilosc, cena jednostkowa, cena laczna) " +
-                                       "i sume calkowita. Jesli jakejs wartosci nie da sie odczytac z pewnoscia, " +
-                                       "zwroc null zamiast zgadywac - lepiej brakujace pole niz zmyslona kwota.",
+                                Text = "To zdjecie paragonu ze sklepu. Wypisz z niego dane sprzedawcy, date, walute " +
+                                       "oraz liste pozycji (nazwa, ilosc, cena jednostkowa, cena laczna) i sume " +
+                                       "calkowita osobno w polu total.\n\n" +
+                                       "WAZNE: do listy items wpisuj WYLACZNIE faktycznie kupione produkty/uslugi - " +
+                                       "nie dodawaj do niej linii podsumowania takich jak \"SUMA\", \"SUMA PLN\", " +
+                                       "\"RAZEM\", \"DO ZAPLATY\", \"RESZTA\", \"GOTOWKA\", \"KARTA\", naliczonego " +
+                                       "podatku VAT ani numeru paragonu/kasy - te wartosci naleza do pola total, " +
+                                       "nie do items.\n\n" +
+                                       "Jesli jakiejs wartosci nie da sie odczytac z pewnoscia, zwroc null zamiast " +
+                                       "zgadywac - lepiej brakujace pole niz zmyslona kwota.",
                             },
                         },
                     },
@@ -104,7 +110,12 @@ namespace NoteEz_Server.Services
             var parsed = JsonSerializer.Deserialize<ParsedReceipt>(text, JsonOptions)
                 ?? throw new InvalidOperationException("Nie udalo sie odczytac danych z paragonu.");
 
-            var items = (parsed.Items ?? []).Select(i => new ReceiptScanItemDto(i.Name, i.Quantity, i.UnitPrice, i.TotalPrice)).ToList();
+            // Siatka bezpieczenstwa - mimo instrukcji w prompcie model czasem i tak wrzuca linie
+            // podsumowania (np. "SUMA PLN") do listy pozycji. Odfiltrowujemy po znanych slowach kluczowych.
+            var items = (parsed.Items ?? [])
+                .Where(i => !IsSummaryLine(i.Name))
+                .Select(i => new ReceiptScanItemDto(i.Name, i.Quantity, i.UnitPrice, i.TotalPrice))
+                .ToList();
 
             var itemsSum = items.Sum(i => i.TotalPrice ?? 0);
             var mismatch = parsed.Total is not null && Math.Abs(itemsSum - parsed.Total.Value) > 0.05m;
@@ -114,6 +125,20 @@ namespace NoteEz_Server.Services
                 date = parsedDate;
 
             return new ReceiptScanResultDto(parsed.Merchant, date, parsed.Currency, items, parsed.Total, mismatch);
+        }
+
+        // Celowo bez "KARTA" - zbyt ogolne slowo, ktore trafia sie tez w nazwach produktow
+        // (np. "karta podarunkowa", "karta SIM").
+        private static readonly string[] SummaryLineKeywords =
+        [
+            "SUMA", "RAZEM", "DO ZAPLATY", "DO ZAPŁATY", "RESZTA", "GOTOWKA", "GOTÓWKA",
+            "PLATNOSC KARTA", "PŁATNOŚĆ KARTĄ", "PARAGON FISKALNY", "NR PARAGONU",
+        ];
+
+        private static bool IsSummaryLine(string name)
+        {
+            var normalized = (name ?? "").Trim().ToUpperInvariant();
+            return SummaryLineKeywords.Any(k => normalized.Contains(k));
         }
 
         private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
