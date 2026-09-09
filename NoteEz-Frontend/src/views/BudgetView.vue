@@ -13,12 +13,24 @@ const groupsStore = useGroupsStore()
 const groupId = computed(() => route.query.groupId || null)
 const group = computed(() => groupsStore.groups.find((g) => g.id === groupId.value))
 
+// Kategorie wybiera sie z listy (datalist) albo po prostu wpisuje nowa nazwe -
+// resolveCategoryId zamienia wpisany tekst na istniejace id albo tworzy nowa kategorie.
+async function resolveCategoryId(name) {
+  const trimmed = (name || '').trim()
+  if (!trimmed) return null
+  const existing = budgetStore.categories.find((c) => c.name.toLowerCase() === trimmed.toLowerCase())
+  if (existing) return existing.id
+  const created = await budgetStore.createCategory(groupId.value, { name: trimmed })
+  return created.id
+}
+
 const receiptFileInput = ref(null)
 const scanning = ref(false)
 const scanError = ref(null)
 const scanResult = ref(null) // ReceiptScanResultDto z backendu, dopoki uzytkownik nie zatwierdzi/odrzuci
 const scanItems = ref([]) // [{ checked, name, amount }] - edytowalna kopia scanResult.items
-const scanCategoryId = ref('')
+const scanCategoryName = ref('')
+const scanDate = ref(new Date().toISOString().slice(0, 10))
 const scanSubmitting = ref(false)
 
 function openReceiptPicker() {
@@ -40,7 +52,9 @@ async function handleReceiptSelected(event) {
       name: i.name,
       amount: i.totalPrice ?? (i.unitPrice && i.quantity ? i.unitPrice * i.quantity : ''),
     }))
-    scanCategoryId.value = ''
+    scanCategoryName.value = ''
+    // Data z paragonu bywa zle odczytana - zawsze edytowalna, z dzisiejsza data jako fallback.
+    scanDate.value = result.date || new Date().toISOString().slice(0, 10)
   } catch (e) {
     scanError.value = e.response?.data?.error || 'Nie udało się odczytać paragonu.'
   } finally {
@@ -56,18 +70,18 @@ function closeScanPanel() {
 
 async function handleAddScannedItems() {
   const toAdd = scanItems.value.filter((i) => i.checked && i.amount && Number(i.amount) > 0)
-  if (!scanCategoryId.value || !toAdd.length) return
+  if (!scanCategoryName.value.trim() || !toAdd.length) return
 
   scanSubmitting.value = true
   try {
-    const date = scanResult.value?.date || new Date().toISOString().slice(0, 10)
+    const categoryId = await resolveCategoryId(scanCategoryName.value)
     for (const item of toAdd) {
       await budgetStore.createEntry(groupId.value, {
-        categoryId: scanCategoryId.value,
+        categoryId,
         type: 'Expense',
         amount: Number(item.amount),
         description: item.name,
-        date,
+        date: scanDate.value,
       })
     }
     await loadMonthData()
@@ -127,15 +141,13 @@ function goToCurrentMonth() {
 }
 
 const showAddForm = ref(false)
-const showAddCategory = ref(false)
-const newCategoryName = ref('')
 const submitting = ref(false)
 const formError = ref(null)
 const pendingRecurringId = ref(null)
 
 const form = ref({
   type: 'Expense',
-  categoryId: '',
+  categoryName: '',
   amount: '',
   description: '',
   date: new Date().toISOString().slice(0, 10),
@@ -145,7 +157,7 @@ const showRecurringForm = ref(false)
 const recurringSubmitting = ref(false)
 const recurringForm = ref({
   type: 'Expense',
-  categoryId: '',
+  categoryName: '',
   amount: '',
   description: '',
   frequency: 'Monthly',
@@ -179,17 +191,9 @@ onMounted(() => {
 watch(groupId, loadAll)
 watch([viewYear, viewMonth, showAllTime], loadMonthData)
 
-async function handleCreateCategory() {
-  if (!newCategoryName.value.trim()) return
-  const category = await budgetStore.createCategory(groupId.value, { name: newCategoryName.value.trim() })
-  form.value.categoryId = category.id
-  newCategoryName.value = ''
-  showAddCategory.value = false
-}
-
 function openAddForm() {
   pendingRecurringId.value = null
-  form.value = { type: 'Expense', categoryId: '', amount: '', description: '', date: new Date().toISOString().slice(0, 10) }
+  form.value = { type: 'Expense', categoryName: '', amount: '', description: '', date: new Date().toISOString().slice(0, 10) }
   showAddForm.value = true
 }
 
@@ -199,7 +203,7 @@ function openAddFormFromRecurring(r) {
   pendingRecurringId.value = r.id
   form.value = {
     type: r.type,
-    categoryId: r.categoryId,
+    categoryName: r.categoryName,
     amount: String(r.amount),
     description: r.description || '',
     date: new Date().toISOString().slice(0, 10),
@@ -209,8 +213,8 @@ function openAddFormFromRecurring(r) {
 
 async function handleSubmit() {
   formError.value = null
-  if (!form.value.categoryId) {
-    formError.value = 'Wybierz kategorię.'
+  if (!form.value.categoryName.trim()) {
+    formError.value = 'Wybierz lub wpisz kategorię.'
     return
   }
   if (!form.value.amount || Number(form.value.amount) <= 0) {
@@ -230,8 +234,9 @@ async function handleSubmit() {
       // zeby lista cyklicznych wpisow nie pokazywala nieaktualnej daty.
       await budgetStore.fetchRecurring(groupId.value)
     } else {
+      const categoryId = await resolveCategoryId(form.value.categoryName)
       await budgetStore.createEntry(groupId.value, {
-        categoryId: form.value.categoryId,
+        categoryId,
         type: form.value.type,
         amount: Number(form.value.amount),
         description: form.value.description || null,
@@ -258,11 +263,12 @@ async function handleDelete(entryId) {
 }
 
 async function handleCreateRecurring() {
-  if (!recurringForm.value.categoryId || !recurringForm.value.amount) return
+  if (!recurringForm.value.categoryName.trim() || !recurringForm.value.amount) return
   recurringSubmitting.value = true
   try {
+    const categoryId = await resolveCategoryId(recurringForm.value.categoryName)
     await budgetStore.createRecurring(groupId.value, {
-      categoryId: recurringForm.value.categoryId,
+      categoryId,
       type: recurringForm.value.type,
       amount: Number(recurringForm.value.amount),
       description: recurringForm.value.description || null,
@@ -321,16 +327,26 @@ function formatDate(dateStr) {
 
       <p v-if="scanError" class="state-msg error-msg">{{ scanError }}</p>
 
+      <datalist id="budget-category-options">
+        <option v-for="c in budgetStore.categories" :key="c.id" :value="c.name" />
+      </datalist>
+
       <div v-if="scanResult" class="add-form card scan-result">
         <h3>Wynik skanowania paragonu{{ scanResult.merchant ? ` - ${scanResult.merchant}` : '' }}</h3>
         <p v-if="scanResult.amountsMismatch" class="state-msg error-msg">
           Suma pozycji nie zgadza się z sumą na paragonie - sprawdź kwoty przed dodaniem.
         </p>
 
-        <select v-model="scanCategoryId" class="input-field">
-          <option value="" disabled>Wybierz kategorię dla wszystkich pozycji…</option>
-          <option v-for="c in budgetStore.categories" :key="c.id" :value="c.id">{{ c.name }}</option>
-        </select>
+        <div class="form-row">
+          <input
+            v-model="scanCategoryName"
+            type="text"
+            list="budget-category-options"
+            class="input-field"
+            placeholder="Kategoria dla wszystkich pozycji (wybierz lub wpisz nową)…"
+          />
+          <input v-model="scanDate" type="date" class="input-field" />
+        </div>
 
         <ul class="scan-items-list">
           <li v-for="(item, idx) in scanItems" :key="idx" class="scan-item-row">
@@ -341,7 +357,7 @@ function formatDate(dateStr) {
         </ul>
 
         <div class="form-row">
-          <button class="btn btn-accent" :disabled="scanSubmitting || !scanCategoryId" @click="handleAddScannedItems">
+          <button class="btn btn-accent" :disabled="scanSubmitting || !scanCategoryName.trim()" @click="handleAddScannedItems">
             {{ scanSubmitting ? 'Dodawanie…' : 'Dodaj zaznaczone pozycje' }}
           </button>
           <button class="btn btn-ghost" @click="closeScanPanel">Anuluj</button>
@@ -394,25 +410,14 @@ function formatDate(dateStr) {
             <option value="Income">Przychód</option>
           </select>
 
-          <select v-model="form.categoryId" class="input-field">
-            <option value="" disabled>Kategoria…</option>
-            <option v-for="c in budgetStore.categories" :key="c.id" :value="c.id">{{ c.name }}</option>
-          </select>
-          <button type="button" class="btn btn-ghost btn-sm" @click="showAddCategory = !showAddCategory">
-            + kategoria
-          </button>
-        </div>
-
-        <div v-if="showAddCategory" class="form-row">
           <input
-            v-model="newCategoryName"
+            v-model="form.categoryName"
             type="text"
+            list="budget-category-options"
             class="input-field"
-            placeholder="Nazwa nowej kategorii…"
+            placeholder="Kategoria (wybierz lub wpisz nową)…"
             maxlength="50"
-            @keyup.enter="handleCreateCategory"
           />
-          <button type="button" class="btn btn-accent btn-sm" @click="handleCreateCategory">Utwórz</button>
         </div>
 
         <div class="form-row">
@@ -467,10 +472,14 @@ function formatDate(dateStr) {
               <option value="Expense">Wydatek</option>
               <option value="Income">Przychód</option>
             </select>
-            <select v-model="recurringForm.categoryId" class="input-field">
-              <option value="" disabled>Kategoria…</option>
-              <option v-for="c in budgetStore.categories" :key="c.id" :value="c.id">{{ c.name }}</option>
-            </select>
+            <input
+              v-model="recurringForm.categoryName"
+              type="text"
+              list="budget-category-options"
+              class="input-field"
+              placeholder="Kategoria (wybierz lub wpisz nową)…"
+              maxlength="50"
+            />
             <select v-model="recurringForm.frequency" class="input-field">
               <option value="Monthly">Co miesiąc</option>
               <option value="Weekly">Co tydzień</option>
