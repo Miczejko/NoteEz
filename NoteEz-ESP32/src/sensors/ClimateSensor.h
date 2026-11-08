@@ -1,6 +1,6 @@
 #pragma once
 
-// Czujnik temperatury/wilgotnosci SHT40 (I2C, GPIO11=SDA, GPIO1=SCL - patrz Config.h).
+// Czujnik temperatury/wilgotnosci SHT40 (I2C, GPIO11=SDA, GPIO22=SCL - patrz Config.h).
 // UWAGA: celowo NIE uzywa biblioteki Wire ani Adafruit_SHT4x - samo ich zlinkowanie do
 // projektu psulo wspoldzielona magistrale SPI dotyku/wyswietlacza (zdiagnozowane empirycznie).
 // Zamiast tego surowy protokol SHT40 zaimplementowany recznie na SoftI2C (bitbanging).

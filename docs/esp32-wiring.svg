@@ -1,0 +1,168 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 930" width="1100" height="930" font-family="Segoe UI, Arial, sans-serif">
+<rect width="1100" height="930" fill="#fff"/>
+<text x="20" y="28" text-anchor="start" font-size="18" fill="#222" font-weight="bold">NoteEz-ESP32 - schemat połączeń (ESP32-C6)</text>
+<rect x="20" y="190" width="110" height="110" rx="6" fill="#f4f6f8" stroke="#333" stroke-width="1.5"/>
+<text x="75.0" y="212" text-anchor="middle" font-weight="bold">Bateria</text>
+<text x="75" y="240" text-anchor="middle" font-size="13" fill="#222">18650</text>
+<text x="75" y="258" text-anchor="middle" font-size="13" fill="#222">3000 mAh</text>
+<text x="124" y="214" text-anchor="end" font-size="13" fill="#222" font-weight="bold">+</text>
+<text x="124" y="286" text-anchor="end" font-size="13" fill="#222" font-weight="bold">−</text>
+<rect x="190" y="170" width="170" height="130" rx="6" fill="#f4f6f8" stroke="#333" stroke-width="1.5"/>
+<text x="275.0" y="192" text-anchor="middle" font-weight="bold">Moduł ładowania</text>
+<text x="275" y="214" text-anchor="middle" font-size="12" fill="#222">ZX-056</text>
+<text x="275" y="230" text-anchor="middle" font-size="11" fill="#222">TP4056 + ochrona</text>
+<text x="196" y="224" text-anchor="start" font-size="13" fill="#222">B+</text>
+<text x="196" y="274" text-anchor="start" font-size="13" fill="#222">B−</text>
+<text x="354" y="242" text-anchor="end" font-size="13" fill="#222">OUT+</text>
+<text x="354" y="292" text-anchor="end" font-size="13" fill="#222">OUT−</text>
+<line x1="130" y1="220" x2="190" y2="220" stroke="#c0392b" stroke-width="2"/>
+<line x1="130" y1="270" x2="190" y2="270" stroke="#222" stroke-width="2"/>
+<line x1="360" y1="220" x2="410" y2="220" stroke="#c0392b" stroke-width="2"/>
+<rect x="410" y="205" width="60" height="30" rx="4" fill="#fff" stroke="#333" stroke-width="1.5"/>
+<text x="440" y="225" text-anchor="middle" font-size="13" fill="#222" font-weight="bold">SW</text>
+<text x="440" y="198" text-anchor="middle" font-size="12" fill="#222">przełącznik</text>
+<line x1="470" y1="220" x2="560" y2="220" stroke="#c0392b" stroke-width="2"/>
+<circle cx="510" cy="220" r="4" fill="#c0392b"/>
+<rect x="560" y="170" width="170" height="130" rx="6" fill="#f4f6f8" stroke="#333" stroke-width="1.5"/>
+<text x="645.0" y="192" text-anchor="middle" font-weight="bold">Step-up 5V / 1A</text>
+<text x="645" y="210" text-anchor="middle" font-size="12" fill="#222">(układ 134N3P)</text>
+<text x="566" y="224" text-anchor="start" font-size="13" fill="#222">IN+</text>
+<text x="566" y="274" text-anchor="start" font-size="13" fill="#222">IN−</text>
+<text x="630" y="294" text-anchor="middle" font-size="12" fill="#222">OUT+ (5V)</text>
+<text x="690" y="294" text-anchor="middle" font-size="13" fill="#222"></text>
+<line x1="360" y1="270" x2="560" y2="270" stroke="#222" stroke-width="2"/>
+<line x1="510" y1="220" x2="510" y2="200" stroke="#c0392b" stroke-width="2"/>
+<rect x="500" y="150" width="20" height="50" fill="#fff" stroke="#333" stroke-width="1.5"/>
+<text x="494" y="180" text-anchor="end" font-size="13" fill="#222">100 kΩ</text>
+<line x1="510" y1="150" x2="510" y2="140" stroke="#1f6feb" stroke-width="2"/>
+<circle cx="510" cy="140" r="4" fill="#1f6feb"/>
+<rect x="500" y="80" width="20" height="50" fill="#fff" stroke="#333" stroke-width="1.5"/>
+<text x="494" y="110" text-anchor="end" font-size="13" fill="#222">100 kΩ</text>
+<line x1="510" y1="140" x2="510" y2="130" stroke="#1f6feb" stroke-width="2"/>
+<line x1="510" y1="80" x2="510" y2="66" stroke="#222" stroke-width="2"/>
+<line x1="510" y1="66" x2="510" y2="74" stroke="#222" stroke-width="2"/>
+<line x1="498" y1="74" x2="522" y2="74" stroke="#222" stroke-width="2"/>
+<line x1="502" y1="79" x2="518" y2="79" stroke="#222" stroke-width="2"/>
+<line x1="506" y1="84" x2="514" y2="84" stroke="#222" stroke-width="2"/>
+<text x="540" y="70" text-anchor="start" font-size="12" fill="#444">→ do pinu GND płytki</text>
+<line x1="510" y1="140" x2="600" y2="140" stroke="#1f6feb" stroke-width="2"/>
+<text x="606" y="144" text-anchor="start" font-size="12" fill="#1f6feb">VBAT_ADC → GPIO1  (napięcie baterii / 2)</text>
+<text x="250" y="120" text-anchor="start" font-size="12" fill="#444">Dzielnik napięcia baterii</text>
+<text x="250" y="136" text-anchor="start" font-size="12" fill="#444">(za przełącznikiem)</text>
+<line x1="630" y1="300" x2="630" y2="360" stroke="#c0392b" stroke-width="2.5"/>
+<line x1="690" y1="300" x2="690" y2="360" stroke="#222" stroke-width="2.5"/>
+<text x="704" y="330" text-anchor="start" font-size="12" fill="#222">OUT− → GND płytki</text>
+<text x="622" y="330" text-anchor="end" font-size="12" fill="#222">OUT+ → 5V</text>
+<rect x="330" y="360" width="420" height="520" rx="6" fill="#eef7ee" stroke="#333" stroke-width="1.5"/>
+<text x="540.0" y="420" text-anchor="middle" font-weight="bold">ESP32-C6 Dev Module</text>
+<text x="630" y="378" text-anchor="middle" font-size="12" fill="#222" font-weight="bold">5V</text>
+<text x="690" y="378" text-anchor="middle" font-size="12" fill="#222" font-weight="bold">GND</text>
+<rect x="30" y="390" width="220" height="470" rx="6" fill="#f9f3e8" stroke="#333" stroke-width="1.5"/>
+<text x="140.0" y="410" text-anchor="middle" font-weight="bold">Moduł 2.8"</text>
+<text x="140.0" y="428" text-anchor="middle" font-size="12" fill="#666">ST7789 + XPT2046</text>
+<line x1="250" y1="440" x2="330" y2="440" stroke="#1f6feb" stroke-width="2"/>
+<circle cx="330" cy="440" r="4" fill="#1f6feb"/>
+<circle cx="250" cy="440" r="4" fill="#1f6feb"/>
+<text x="242" y="444" text-anchor="end" font-size="12" fill="#222">SCK / T_CLK</text>
+<text x="340" y="444" text-anchor="start" font-size="12" fill="#222">GPIO6</text>
+<line x1="250" y1="480" x2="330" y2="480" stroke="#1f6feb" stroke-width="2"/>
+<circle cx="330" cy="480" r="4" fill="#1f6feb"/>
+<circle cx="250" cy="480" r="4" fill="#1f6feb"/>
+<text x="242" y="484" text-anchor="end" font-size="12" fill="#222">SDI / T_DIN</text>
+<text x="340" y="484" text-anchor="start" font-size="12" fill="#222">GPIO7</text>
+<line x1="250" y1="520" x2="330" y2="520" stroke="#1f6feb" stroke-width="2"/>
+<circle cx="330" cy="520" r="4" fill="#1f6feb"/>
+<circle cx="250" cy="520" r="4" fill="#1f6feb"/>
+<text x="242" y="524" text-anchor="end" font-size="12" fill="#222">SDO / T_DO</text>
+<text x="340" y="524" text-anchor="start" font-size="12" fill="#222">GPIO2</text>
+<line x1="250" y1="560" x2="330" y2="560" stroke="#1f6feb" stroke-width="2"/>
+<circle cx="330" cy="560" r="4" fill="#1f6feb"/>
+<circle cx="250" cy="560" r="4" fill="#1f6feb"/>
+<text x="242" y="564" text-anchor="end" font-size="12" fill="#222">CS (panel)</text>
+<text x="340" y="564" text-anchor="start" font-size="12" fill="#222">GPIO18</text>
+<line x1="250" y1="600" x2="330" y2="600" stroke="#1f6feb" stroke-width="2"/>
+<circle cx="330" cy="600" r="4" fill="#1f6feb"/>
+<circle cx="250" cy="600" r="4" fill="#1f6feb"/>
+<text x="242" y="604" text-anchor="end" font-size="12" fill="#222">DC</text>
+<text x="340" y="604" text-anchor="start" font-size="12" fill="#222">GPIO19</text>
+<line x1="250" y1="640" x2="330" y2="640" stroke="#1f6feb" stroke-width="2"/>
+<circle cx="330" cy="640" r="4" fill="#1f6feb"/>
+<circle cx="250" cy="640" r="4" fill="#1f6feb"/>
+<text x="242" y="644" text-anchor="end" font-size="12" fill="#222">RST</text>
+<text x="340" y="644" text-anchor="start" font-size="12" fill="#222">GPIO20</text>
+<line x1="250" y1="680" x2="330" y2="680" stroke="#1f6feb" stroke-width="2"/>
+<circle cx="330" cy="680" r="4" fill="#1f6feb"/>
+<circle cx="250" cy="680" r="4" fill="#1f6feb"/>
+<text x="242" y="684" text-anchor="end" font-size="12" fill="#222">T_CS (dotyk)</text>
+<text x="340" y="684" text-anchor="start" font-size="12" fill="#222">GPIO21</text>
+<line x1="250" y1="720" x2="330" y2="720" stroke="#1f6feb" stroke-width="2"/>
+<circle cx="330" cy="720" r="4" fill="#1f6feb"/>
+<circle cx="250" cy="720" r="4" fill="#1f6feb"/>
+<text x="242" y="724" text-anchor="end" font-size="12" fill="#222">T_IRQ</text>
+<text x="340" y="724" text-anchor="start" font-size="12" fill="#222">GPIO3</text>
+<line x1="250" y1="760" x2="330" y2="760" stroke="#1f6feb" stroke-width="2"/>
+<circle cx="330" cy="760" r="4" fill="#1f6feb"/>
+<circle cx="250" cy="760" r="4" fill="#1f6feb"/>
+<text x="242" y="764" text-anchor="end" font-size="12" fill="#222">LED (BLK)</text>
+<text x="340" y="764" text-anchor="start" font-size="12" fill="#222">GPIO10</text>
+<line x1="250" y1="800" x2="330" y2="800" stroke="#e67e22" stroke-width="2"/>
+<circle cx="330" cy="800" r="4" fill="#e67e22"/>
+<circle cx="250" cy="800" r="4" fill="#e67e22"/>
+<text x="242" y="804" text-anchor="end" font-size="12" fill="#222">VCC</text>
+<text x="340" y="804" text-anchor="start" font-size="12" fill="#222">3V3</text>
+<line x1="250" y1="840" x2="330" y2="840" stroke="#222" stroke-width="2"/>
+<circle cx="330" cy="840" r="4" fill="#222"/>
+<circle cx="250" cy="840" r="4" fill="#222"/>
+<text x="242" y="844" text-anchor="end" font-size="12" fill="#222">GND</text>
+<text x="340" y="844" text-anchor="start" font-size="12" fill="#222">GND</text>
+<text x="140" y="876" text-anchor="middle" font-size="11" fill="#666">SCK/MOSI/MISO wspólne dla wyświetlacza i dotyku</text>
+<rect x="870" y="440" width="190" height="170" rx="6" fill="#f9f3e8" stroke="#333" stroke-width="1.5"/>
+<text x="965.0" y="460" text-anchor="middle" font-weight="bold">Czujnik SHT40</text>
+<text x="965.0" y="476" text-anchor="middle" font-size="11" fill="#666">(SoftI2C, adres 0x44)</text>
+<line x1="750" y1="420" x2="890" y2="420" stroke="#1f6feb" stroke-width="2"/>
+<circle cx="750" cy="420" r="4" fill="#1f6feb"/>
+<text x="740" y="424" text-anchor="end" font-size="12" fill="#222">GPIO1</text>
+<line x1="750" y1="480" x2="870" y2="480" stroke="#1f6feb" stroke-width="2"/>
+<circle cx="750" cy="480" r="4" fill="#1f6feb"/>
+<text x="740" y="484" text-anchor="end" font-size="12" fill="#222">GPIO11</text>
+<circle cx="870" cy="480" r="4" fill="#1f6feb"/>
+<text x="878" y="484" text-anchor="start" font-size="12" fill="#222">SDA</text>
+<line x1="750" y1="520" x2="870" y2="520" stroke="#1f6feb" stroke-width="2"/>
+<circle cx="750" cy="520" r="4" fill="#1f6feb"/>
+<text x="740" y="524" text-anchor="end" font-size="12" fill="#222">GPIO22</text>
+<circle cx="870" cy="520" r="4" fill="#1f6feb"/>
+<text x="878" y="524" text-anchor="start" font-size="12" fill="#222">SCL</text>
+<line x1="750" y1="560" x2="870" y2="560" stroke="#e67e22" stroke-width="2"/>
+<circle cx="750" cy="560" r="4" fill="#e67e22"/>
+<text x="740" y="564" text-anchor="end" font-size="12" fill="#222">3V3</text>
+<circle cx="870" cy="560" r="4" fill="#e67e22"/>
+<text x="878" y="564" text-anchor="start" font-size="12" fill="#222">VCC</text>
+<line x1="750" y1="600" x2="870" y2="600" stroke="#222" stroke-width="2"/>
+<circle cx="750" cy="600" r="4" fill="#222"/>
+<text x="740" y="604" text-anchor="end" font-size="12" fill="#222">GND</text>
+<circle cx="870" cy="600" r="4" fill="#222"/>
+<text x="878" y="604" text-anchor="start" font-size="12" fill="#222">GND</text>
+<text x="770" y="412" text-anchor="start" font-size="12" fill="#1f6feb">z dzielnika baterii (VBAT_ADC)</text>
+<rect x="870" y="650" width="190" height="110" rx="6" fill="#f9f3e8" stroke="#333" stroke-width="1.5"/>
+<text x="965.0" y="670" text-anchor="middle" font-weight="bold">Brzęczyk pasywny</text>
+<line x1="750" y1="700" x2="870" y2="700" stroke="#1f6feb" stroke-width="2"/>
+<circle cx="750" cy="700" r="4" fill="#1f6feb"/>
+<circle cx="870" cy="700" r="4" fill="#1f6feb"/>
+<text x="740" y="704" text-anchor="end" font-size="12" fill="#222">GPIO23</text>
+<text x="878" y="704" text-anchor="start" font-size="12" fill="#222">+</text>
+<line x1="750" y1="740" x2="870" y2="740" stroke="#222" stroke-width="2"/>
+<circle cx="750" cy="740" r="4" fill="#222"/>
+<circle cx="870" cy="740" r="4" fill="#222"/>
+<text x="740" y="744" text-anchor="end" font-size="12" fill="#222">GND</text>
+<text x="878" y="744" text-anchor="start" font-size="12" fill="#222">−</text>
+<rect x="780" y="790" width="290" height="110" fill="#fff" stroke="#bbb"/>
+<text x="790" y="810" text-anchor="start" font-size="13" fill="#222" font-weight="bold">Legenda</text>
+<line x1="790" y1="830" x2="820" y2="830" stroke="#c0392b" stroke-width="3"/>
+<text x="828" y="834" text-anchor="start" font-size="12" fill="#222">plus baterii / 5V</text>
+<line x1="790" y1="847" x2="820" y2="847" stroke="#222" stroke-width="3"/>
+<text x="828" y="851" text-anchor="start" font-size="12" fill="#222">GND (wspólna masa)</text>
+<line x1="790" y1="864" x2="820" y2="864" stroke="#1f6feb" stroke-width="3"/>
+<text x="828" y="868" text-anchor="start" font-size="12" fill="#222">sygnał GPIO</text>
+<line x1="790" y1="881" x2="820" y2="881" stroke="#e67e22" stroke-width="3"/>
+<text x="828" y="885" text-anchor="start" font-size="12" fill="#222">3,3 V</text>
+</svg>
