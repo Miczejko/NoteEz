@@ -6,7 +6,7 @@ import AppLayout from '../components/AppLayout.vue'
   <AppLayout>
     <div class="policy card">
       <h1>Polityka prywatności</h1>
-      <p class="updated">Ostatnia aktualizacja: 8 września 2026 r.</p>
+      <p class="updated">Ostatnia aktualizacja: 8 listopada 2026 r.</p>
 
       <section>
         <h2>1. Administrator danych</h2>
@@ -23,6 +23,11 @@ import AppLayout from '../components/AppLayout.vue'
         <ul>
           <li>Dane konta: adres e-mail, nazwa użytkownika, hasło (przechowywane w formie zahaszowanej).</li>
           <li>Treść notatek: tekst, rysunki odręczne oraz nagrania głosowe dodane przez użytkownika.</li>
+          <li>
+            Dane budżetu: wpisy przychodów i wydatków (kwota, data, opis), nazwy kategorii oraz
+            cykliczne wpisy. Jeśli skorzystasz ze skanowania paragonu, przetwarzamy też zdjęcie paragonu
+            (patrz pkt 5) — zapisujemy z niego wyłącznie zatwierdzone przez Ciebie wpisy, nie samo zdjęcie.
+          </li>
           <li>Dane urządzeń: identyfikatory sparowanych urządzeń ESP32 oraz znaczniki czasu ich aktywności.</li>
           <li>Dane techniczne: adres IP, typ przeglądarki i podstawowe logi serwera, przetwarzane w celu zapewnienia bezpieczeństwa usługi.</li>
         </ul>
@@ -86,8 +91,11 @@ import AppLayout from '../components/AppLayout.vue'
           </li>
           <li>
             <strong>Anthropic</strong> — jeśli skorzystasz z funkcji skanowania paragonu w module
-            budżetu, zdjęcie paragonu jest przesyłane do Anthropic w celu automatycznego odczytania
+            budżetu, zdjęcie paragonu wraz z nazwami Twoich kategorii budżetowych (potrzebnymi do
+            automatycznego przypisania wydatków) jest przesyłane do Anthropic w celu odczytania
             pozycji zakupowych; zdjęcie nie jest przez nas trwale zapisywane ani przechowywane.
+            Zdjęcie paragonu może zawierać dane osobowe (np. fragment numeru karty płatniczej) —
+            zalecamy zasłonięcie ich przed zrobieniem zdjęcia.
           </li>
         </ul>
         <p>
