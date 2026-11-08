@@ -119,11 +119,13 @@ export const useBudgetStore = defineStore('budget', () => {
     dueSoon.value = dueSoon.value.filter((r) => r.id !== recurringId)
   }
 
-  async function scanReceipt(file) {
+  // groupId decyduje, z ktorej puli kategorii backend dopasowuje pozycje paragonu.
+  async function scanReceipt(file, groupId) {
     const formData = new FormData()
     formData.append('file', file)
     const { data } = await api.post('/budget/receipts/scan', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      params: groupParam(groupId),
     })
     return data
   }

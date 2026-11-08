@@ -161,13 +161,21 @@ namespace NoteEz_Server.Models
         [Required]
         DateOnly NextDueDate);
 
-    public record ReceiptScanItemDto(string Name, decimal? Quantity, decimal? UnitPrice, decimal? TotalPrice);
+    // Suma wydatkow z paragonu w jednej kategorii. CategoryId != null -> istniejaca kategoria.
+    // CategoryId == null i SuggestedName != null -> propozycja nowej kategorii (nic nie jest zapisywane w bazie,
+    // uzytkownik zatwierdza/zmienia ja w UI). Oba null -> pozycje bez kategorii ("Inne").
+    // Items - nazwy pozycji z paragonu, ktore trafily do tej grupy (do podgladu / zmiany przypisania).
+    public record ReceiptScanCategoryTotalDto(
+        Guid? CategoryId,
+        string? SuggestedName,
+        decimal Total,
+        IReadOnlyList<string> Items);
 
     public record ReceiptScanResultDto(
         string? Merchant,
         DateOnly? Date,
         string? Currency,
-        IReadOnlyList<ReceiptScanItemDto> Items,
+        IReadOnlyList<ReceiptScanCategoryTotalDto> Categories,
         decimal? Total,
         // true, gdy suma pozycji nie zgadza sie z odczytana suma paragonu (w granicach tolerancji) -
         // sygnal dla frontendu, zeby pokazac ostrzezenie "sprawdz kwoty" zamiast ufac im w ciemno.

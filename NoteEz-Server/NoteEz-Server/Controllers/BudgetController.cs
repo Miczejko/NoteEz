@@ -158,7 +158,7 @@ namespace NoteEz_Server.Controllers
         [HttpPost("receipts/scan")]
         [RequestSizeLimit(MaxReceiptImageSizeBytes)]
         [EnableRateLimiting("scan-receipt")]
-        public async Task<IActionResult> ScanReceipt(IFormFile file)
+        public async Task<IActionResult> ScanReceipt(IFormFile file, [FromQuery] Guid? groupId)
         {
             if (file is null || file.Length == 0)
                 return BadRequest(new { error = "Brak zdjęcia paragonu." });
@@ -180,9 +180,10 @@ namespace NoteEz_Server.Controllers
 
             try
             {
-                var result = await _receiptScan.ScanAsync(ms.ToArray(), mediaType);
+                var result = await _receiptScan.ScanAsync(ms.ToArray(), mediaType, UserId, groupId);
                 return Ok(result);
             }
+            catch (UnauthorizedAccessException) { return Forbid(); }
             catch (InvalidOperationException ex)
             {
                 return BadRequest(new { error = ex.Message });

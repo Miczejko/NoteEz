@@ -28,8 +28,9 @@ const receiptFileInput = ref(null)
 const scanning = ref(false)
 const scanError = ref(null)
 const scanResult = ref(null) // ReceiptScanResultDto z backendu, dopoki uzytkownik nie zatwierdzi/odrzuci
-const scanItems = ref([]) // [{ checked, name, amount }] - edytowalna kopia scanResult.items
-const scanCategoryName = ref('')
+// Edytowalna kopia scanResult.categories: [{ checked, categoryName, amount, items: [nazwy], isNew }]
+// categoryName: dopasowana kategoria / propozycja modelu / pusty string (uzytkownik uzupelnia).
+const scanRows = ref([])
 const scanDate = ref(new Date().toISOString().slice(0, 10))
 const scanSubmitting = ref(false)
 
@@ -45,14 +46,19 @@ async function handleReceiptSelected(event) {
   scanning.value = true
   scanError.value = null
   try {
-    const result = await budgetStore.scanReceipt(file)
+    const result = await budgetStore.scanReceipt(file, groupId.value)
     scanResult.value = result
-    scanItems.value = result.items.map((i) => ({
-      checked: true,
-      name: i.name,
-      amount: i.totalPrice ?? (i.unitPrice && i.quantity ? i.unitPrice * i.quantity : ''),
-    }))
-    scanCategoryName.value = ''
+    scanRows.value = result.categories.map((c) => {
+      const existing = c.categoryId && budgetStore.categories.find((x) => x.id === c.categoryId)
+      return {
+        checked: true,
+        categoryName: existing?.name || c.suggestedName || '',
+        amount: Math.round(c.total * 100) / 100,
+        items: c.items,
+        // true -> kategoria jeszcze nie istnieje, powstanie dopiero po zatwierdzeniu
+        isSuggested: !existing && !!c.suggestedName,
+      }
+    })
     // Data z paragonu bywa zle odczytana - zawsze edytowalna, z dzisiejsza data jako fallback.
     scanDate.value = result.date || new Date().toISOString().slice(0, 10)
   } catch (e) {
@@ -64,23 +70,32 @@ async function handleReceiptSelected(event) {
 
 function closeScanPanel() {
   scanResult.value = null
-  scanItems.value = []
+  scanRows.value = []
   scanError.value = null
 }
 
+// Wiersz jest gotowy do dodania, gdy zaznaczony, ma kategorie i dodatnia kwote.
+function isScanRowValid(r) {
+  return r.checked && r.categoryName.trim() && Number(r.amount) > 0
+}
+
+const scanValidRows = computed(() => scanRows.value.filter(isScanRowValid))
+
 async function handleAddScannedItems() {
-  const toAdd = scanItems.value.filter((i) => i.checked && i.amount && Number(i.amount) > 0)
-  if (!scanCategoryName.value.trim() || !toAdd.length) return
+  const toAdd = scanValidRows.value
+  if (!toAdd.length) return
 
   scanSubmitting.value = true
   try {
-    const categoryId = await resolveCategoryId(scanCategoryName.value)
-    for (const item of toAdd) {
+    // Sekwencyjnie: resolveCategoryId tworzy nowa kategorie tylko raz, gdy dwa wiersze maja te sama nowa nazwe.
+    for (const row of toAdd) {
+      const categoryId = await resolveCategoryId(row.categoryName)
       await budgetStore.createEntry(groupId.value, {
         categoryId,
         type: 'Expense',
-        amount: Number(item.amount),
-        description: item.name,
+        amount: Number(row.amount),
+        // backend: Description max 500 znakow
+        description: row.items.join(', ').slice(0, 500),
         date: scanDate.value,
       })
     }
@@ -331,7 +346,7 @@ function formatDate(dateStr) {
         <option v-for="c in budgetStore.categories" :key="c.id" :value="c.name" />
       </datalist>
 
-      <div v-if="scanResult && !scanItems.length" class="add-form card scan-result">
+      <div v-if="scanResult && !scanRows.length" class="add-form card scan-result">
         <h3>Wynik skanowania paragonu</h3>
         <p class="state-msg error-msg">
           Nie udało się rozpoznać żadnych pozycji na zdjęciu - upewnij się, że to wyraźne zdjęcie
@@ -347,27 +362,32 @@ function formatDate(dateStr) {
         </p>
 
         <div class="form-row">
-          <input
-            v-model="scanCategoryName"
-            type="text"
-            list="budget-category-options"
-            class="input-field"
-            placeholder="Kategoria dla wszystkich pozycji (wybierz lub wpisz nową)…"
-          />
           <input v-model="scanDate" type="date" class="input-field" />
         </div>
 
         <ul class="scan-items-list">
-          <li v-for="(item, idx) in scanItems" :key="idx" class="scan-item-row">
-            <input type="checkbox" v-model="item.checked" />
-            <input v-model="item.name" type="text" class="input-field" placeholder="Nazwa pozycji" />
-            <input v-model="item.amount" type="number" min="0" step="0.01" class="input-field scan-amount" placeholder="Kwota" />
+          <li v-for="(row, idx) in scanRows" :key="idx" class="scan-row">
+            <div class="scan-item-row">
+              <input type="checkbox" v-model="row.checked" />
+              <input
+                v-model="row.categoryName"
+                type="text"
+                list="budget-category-options"
+                class="input-field"
+                placeholder="Kategoria (wybierz lub wpisz nową)…"
+              />
+              <input v-model="row.amount" type="number" min="0" step="0.01" class="input-field scan-amount" placeholder="Kwota" />
+            </div>
+            <p class="scan-row-items">
+              <span v-if="row.isSuggested" class="scan-badge">propozycja nowej kategorii</span>
+              {{ row.items.join(', ') }}
+            </p>
           </li>
         </ul>
 
         <div class="form-row">
-          <button class="btn btn-accent" :disabled="scanSubmitting || !scanCategoryName.trim()" @click="handleAddScannedItems">
-            {{ scanSubmitting ? 'Dodawanie…' : 'Dodaj zaznaczone pozycje' }}
+          <button class="btn btn-accent" :disabled="scanSubmitting || !scanValidRows.length" @click="handleAddScannedItems">
+            {{ scanSubmitting ? 'Dodawanie…' : 'Dodaj zaznaczone kategorie' }}
           </button>
           <button class="btn btn-ghost" @click="closeScanPanel">Anuluj</button>
         </div>
@@ -574,6 +594,23 @@ function formatDate(dateStr) {
   gap: 0.5rem;
   padding: 0;
   margin: 0;
+}
+
+.scan-row-items {
+  margin: 0.25rem 0 0 1.75rem;
+  font-size: 0.85rem;
+  opacity: 0.7;
+  overflow-wrap: anywhere;
+}
+
+.scan-badge {
+  display: inline-block;
+  margin-right: 0.5rem;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-size: 0.75rem;
+  color: var(--color-primary);
 }
 
 .scan-item-row {
