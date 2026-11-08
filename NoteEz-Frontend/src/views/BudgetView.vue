@@ -203,6 +203,26 @@ onMounted(() => {
   loadAll()
 })
 
+// Filtr kategorii dziala po stronie klienta na juz pobranych wpisach (miesiac / "Wszystkie").
+// Pusty string = wszystkie kategorie.
+const filterCategoryId = ref('')
+
+const filteredEntries = computed(() =>
+  filterCategoryId.value
+    ? budgetStore.entries.filter((e) => e.categoryId === filterCategoryId.value)
+    : budgetStore.entries,
+)
+
+// Bilans widocznych wpisow (przychody - wydatki) - przydatny po zawezeniu do jednej kategorii.
+const filteredBalance = computed(() =>
+  filteredEntries.value.reduce((sum, e) => sum + (e.type === 'Income' ? e.amount : -e.amount), 0),
+)
+
+// Kategorie z innej puli (inna grupa / budzet osobisty) nie istnieja po przelaczeniu - zerujemy filtr.
+watch(groupId, () => {
+  filterCategoryId.value = ''
+})
+
 watch(groupId, loadAll)
 watch([viewYear, viewMonth, showAllTime], loadMonthData)
 
@@ -465,13 +485,28 @@ function formatDate(dateStr) {
         </button>
       </div>
 
+      <div v-if="budgetStore.categories.length" class="category-filter">
+        <label for="budget-category-filter">Kategoria:</label>
+        <select id="budget-category-filter" v-model="filterCategoryId" class="input-field">
+          <option value="">Wszystkie</option>
+          <option v-for="c in budgetStore.categories" :key="c.id" :value="c.id">{{ c.name }}</option>
+        </select>
+        <span v-if="filterCategoryId" class="filter-summary">
+          {{ filteredEntries.length }} wpisów, bilans:
+          <strong :class="filteredBalance >= 0 ? 'income' : 'expense'">{{ formatAmount(filteredBalance, 'PLN') }}</strong>
+        </span>
+      </div>
+
       <div v-if="budgetStore.loading" class="state-msg">Ładowanie…</div>
       <div v-else-if="budgetStore.error" class="state-msg error-msg">{{ budgetStore.error }}</div>
       <div v-else-if="!budgetStore.entries.length" class="empty-state card">
         <p>Brak wpisów. Dodaj pierwszy przychód lub wydatek.</p>
       </div>
+      <div v-else-if="!filteredEntries.length" class="empty-state card">
+        <p>Brak wpisów w tej kategorii.</p>
+      </div>
       <ul v-else class="entries-list">
-        <li v-for="entry in budgetStore.entries" :key="entry.id" class="entry-row card">
+        <li v-for="entry in filteredEntries" :key="entry.id" class="entry-row card">
           <div class="entry-main">
             <span class="entry-category">{{ entry.categoryName }}</span>
             <span v-if="entry.description" class="entry-desc">{{ entry.description }}</span>
@@ -626,6 +661,22 @@ function formatDate(dateStr) {
 .scan-amount {
   max-width: 120px;
   flex: 0 0 auto !important;
+}
+
+.category-filter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.category-filter .input-field {
+  flex: 0 1 220px;
+  min-width: 0;
+}
+
+.filter-summary {
+  font-size: 0.9rem;
 }
 
 .month-nav {
