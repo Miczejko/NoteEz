@@ -4,19 +4,19 @@
 #include <driver/gpio.h>
 
 #include "Config.h"
-#include "Colors.h"
-#include "Display.h"
-#include "State.h"
-#include "UiHelpers.h"
-#include "WifiPairing.h"
-#include "SleepMode.h"
-#include "NotesScreen.h"
-#include "NoteDetailScreen.h"
-#include "DrawingScreen.h"
-#include "ClimateSensor.h"
-#include "WeatherScreen.h"
-#include "TimerScreen.h"
-#include "Buzzer.h"
+#include "src/Colors.h"
+#include "src/display/Display.h"
+#include "src/State.h"
+#include "src/UiHelpers.h"
+#include "src/network/WifiPairing.h"
+#include "src/SleepMode.h"
+#include "src/screens/NotesScreen.h"
+#include "src/screens/NoteDetailScreen.h"
+#include "src/screens/DrawingScreen.h"
+#include "src/sensors/ClimateSensor.h"
+#include "src/screens/WeatherScreen.h"
+#include "src/screens/TimerScreen.h"
+#include "src/buzzer/Buzzer.h"
 
 void setup() {
   Serial.begin(115200);

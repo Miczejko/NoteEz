@@ -1,6 +1,6 @@
 #include "ClimateSensor.h"
-#include "Config.h"
-#include "SoftI2C.h"
+#include "../../Config.h"
+#include "../SoftI2C.h"
 
 #define SHT40_I2C_ADDR 0x44
 #define SHT40_CMD_MEASURE_HIGH_PRECISION 0xFD

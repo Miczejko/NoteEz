@@ -2,15 +2,15 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
-#include "Display.h"
-#include "Colors.h"
-#include "Config.h"
-#include "State.h"
-#include "UiHelpers.h"
-#include "ClimateSensor.h"
+#include "../display/Display.h"
+#include "../Colors.h"
+#include "../../Config.h"
+#include "../State.h"
+#include "../UiHelpers.h"
+#include "../sensors/ClimateSensor.h"
 #include "WeatherScreen.h"
-#include "Buzzer.h"
-#include "Battery.h"
+#include "../buzzer/Buzzer.h"
+#include "../battery/Battery.h"
 
 int listRowsPerPage() {
   return (LIST_CONTENT_BOTTOM - LIST_START_Y) / LIST_ROW_HEIGHT;

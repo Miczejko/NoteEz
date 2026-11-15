@@ -2,13 +2,13 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
-#include "Display.h"
-#include "Colors.h"
-#include "Config.h"
-#include "State.h"
-#include "UiHelpers.h"
+#include "../display/Display.h"
+#include "../Colors.h"
+#include "../../Config.h"
+#include "../State.h"
+#include "../UiHelpers.h"
 #include "NotesScreen.h"
-#include "Buzzer.h"
+#include "../buzzer/Buzzer.h"
 
 std::vector<String> wrapText(const String& text, int charsPerLine) {
   std::vector<String> lines;

@@ -2,12 +2,12 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
-#include "Display.h"
-#include "Colors.h"
-#include "Config.h"
-#include "State.h"
-#include "UiHelpers.h"
-#include "ClimateSensor.h"
+#include "../display/Display.h"
+#include "../Colors.h"
+#include "../../Config.h"
+#include "../State.h"
+#include "../UiHelpers.h"
+#include "../sensors/ClimateSensor.h"
 
 struct WeatherHour {
   String label; // "HH:MM" wyciete z ISO8601 zwracanego przez API

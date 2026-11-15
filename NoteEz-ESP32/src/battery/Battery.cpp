@@ -1,6 +1,6 @@
 #include "Battery.h"
 #include <Arduino.h>
-#include "Config.h"
+#include "../../Config.h"
 
 float batteryVoltage = 0.0f;
 int batteryPercent = 0;

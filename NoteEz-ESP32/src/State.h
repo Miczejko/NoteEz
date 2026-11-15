@@ -4,7 +4,7 @@
 #include <Preferences.h>
 #include <ArduinoJson.h>
 #include <vector>
-#include "Config.h"
+#include "../Config.h"
 
 extern WiFiManager wm;
 extern Preferences prefs;

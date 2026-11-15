@@ -1,6 +1,6 @@
 #include "UiHelpers.h"
-#include "Display.h"
-#include "Config.h"
+#include "display/Display.h"
+#include "../Config.h"
 
 void showMessage(const char* line1, const char* line2, uint32_t color) {
   display.fillScreen(COLOR_BG);
