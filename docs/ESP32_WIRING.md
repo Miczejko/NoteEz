@@ -21,6 +21,10 @@ Komponenty: ogniwo 18650 (3000 mAh), moduł ładowania ZX-056 (TP4056 z ochroną
 | OUT+ step-upa (5V) | pin 5V płytki |
 | OUT− step-upa | dowolny pin GND płytki |
 | dolny rezystor dzielnika | dowolny pin GND płytki |
+| C1 (+) elektrolit 470 µF (min. 10 V; na start może być 100 µF/50 V) | pin 5V płytki |
+| C1 (− , pasek na obudowie) | pin GND płytki |
+
+C1 jest wpięty równolegle do 5V/GND tuż przy płytce i tłumi spadki napięcia przy starcie WiFi (objaw: pętla restartów przy łączeniu z WiFi, brownout). Obowiązuje polaryzacja - minus do GND. Opcjonalnie równolegle ceramiczny 100 nF (oznaczenie 104).
 
 Pomiar baterii: wyjście przełącznika → 100 kΩ → **GPIO1** → 100 kΩ → GND płytki (dzielenie przez 2, `BATTERY_DIVIDER_RATIO = 2.0`).
 

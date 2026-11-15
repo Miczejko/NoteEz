@@ -21,6 +21,13 @@
 // bo tylko GO/wylaczamy je - nie budzimy sie przez niego).
 #define BACKLIGHT_PIN 10
 
+// Ograniczenie poboru pradu przy starcie WiFi (pik pradu radia powodowal brownout/restarty).
+// Podswietlenie jest sciemnione (PWM 0-255) na czas laczenia z WiFi, potem wraca na pelna jasnosc.
+// Moc nadawania WiFi jest obnizona na stale - jesli zasieg bedzie za maly, wybierz WIFI_POWER_15dBm
+// albo wieksza (domyslnie ESP32 ma ok. 20 dBm).
+#define BACKLIGHT_DIM_DURING_WIFI 40
+#define WIFI_TX_POWER WIFI_POWER_11dBm
+
 // Czujnik temperatury/wilgotnosci SHT40 (I2C bitbangowane, SoftI2C - patrz ClimateSensor.h).
 // Biblioteka Wire psula dzielona magistrale SPI dotyku/wyswietlacza (nawet nieuzywana!),
 // dlatego I2C jest tu zaimplementowane recznie na zwyklych GPIO, bez Wire.h.

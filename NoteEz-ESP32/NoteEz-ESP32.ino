@@ -26,6 +26,8 @@ void setup() {
   // ESP_SLEEP_WAKEUP_GPIO (touch zadzialal) / ESP_SLEEP_WAKEUP_UNDEFINED (zwykly reset/power-on).
   esp_sleep_wakeup_cause_t wakeupCause = esp_sleep_get_wakeup_cause();
   Serial.printf("[boot] przyczyna wybudzenia: %d\n", (int)wakeupCause);
+  // Diagnostyka restartow: 15 (ESP_RST_BROWNOUT) = spadek napiecia zasilania
+  Serial.printf("[boot] przyczyna resetu: %d (1=power-on, 3=SW, 4=panic, 15=brownout)\n", (int)esp_reset_reason());
 
   initBuzzer();
   if (wakeupCause == ESP_SLEEP_WAKEUP_GPIO) {
@@ -75,7 +77,17 @@ void setup() {
   wm.setAPCallback(configModeCallback);
   wm.setConfigPortalTimeout(180); // po 3 min bez konfiguracji restart i kolejna proba
 
+  // Mniejszy pobor pradu przy starcie radia: sciemnione podswietlenie + nizsza moc nadawania.
+  analogWrite(BACKLIGHT_PIN, BACKLIGHT_DIM_DURING_WIFI);
+  WiFi.mode(WIFI_STA);
+  WiFi.setTxPower(WIFI_TX_POWER);
+  delay(100); // chwila na ustabilizowanie zasilania po wlaczeniu radia
+
   bool connected = wm.autoConnect("Notatnik-ESP32");
+
+  // przywrocenie pelnego podswietlenia (pinMode odlacza PWM, dalej zwykle sterowanie cyfrowe)
+  pinMode(BACKLIGHT_PIN, OUTPUT);
+  digitalWrite(BACKLIGHT_PIN, HIGH);
 
   if (!connected) {
     buzzError();
@@ -98,7 +110,7 @@ void setup() {
   Serial.println("apiHost: " + apiHost);
 
   showMessage("Polaczono!", WiFi.localIP().toString().c_str(), COLOR_ACCENT_MINT);
-  delay(1000);
+  delay(300);
 
   // jesli w portalu wpisano kod parowania - sparuj urzadzenie zanim wejdziemy do glownego ekranu
   String enteredCode = String(pairingCodeParam->getValue());
