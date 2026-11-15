@@ -416,8 +416,8 @@ async function handleDeleteAudio(audioId) {
   display: flex;
   gap: 0.25rem;
   border-bottom: 2px solid var(--color-border);
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  /* Bez overflow: aktywna zakladka zachodzi o 2px na dolna kreske (margin-bottom: -2px),
+     a overflow-x:auto wymusza tez overflow-y:auto i pokazywal sie pionowy suwak. */
 }
 
 .tab {
