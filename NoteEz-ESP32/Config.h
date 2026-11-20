@@ -88,11 +88,56 @@
 #define RESET_BTN_H SCROLL_BTN_H
 #define RESET_HOLD_MS 2000
 
-// przycisk "Rysunek" w prawym gornym rogu ekranu szczegolow (widoczny gdy notatka ma rysunki)
+// przycisk "Rys." w prawym gornym rogu ekranu szczegolow (zawsze widoczny - otwiera liste rysunkow
+// notatki albo napis "Brak rysunkow")
 #define DRAWING_BTN_X 270
 #define DRAWING_BTN_Y 0
 #define DRAWING_BTN_W 50
 #define DRAWING_BTN_H 32
+
+// przycisk "Nowy rysunek" w gornym pasku ekranu rysunkow (po prawej, obok "Wstecz"). Pasek ma 32 px
+// wysokosci, a przelaczanie rysunkow dotykiem lewej/prawej polowy dziala tylko ponizej paska.
+#define DRAW_NEW_BTN_X 224
+#define DRAW_NEW_BTN_Y 0
+#define DRAW_NEW_BTN_W 92
+#define DRAW_NEW_BTN_H 32
+
+// ---- edytor nowego rysunku (SCREEN_DRAW_EDIT, patrz DrawingEditScreen.h) ----
+// Limity pamieci (ESP32-C6, ~181 KB wolnej sterty): punkty to int16 x/y (4 B), wiec bufor punktow to
+// 800 * 4 = 3.2 KB, a bufor linii 40 * 6 B = 240 B - oba statyczne, bez alokacji w trakcie rysowania.
+// Najwiekszy JSON (800 punktow, 40 linii) to ok. 20 KB wysylane jednym POST-em - miesci sie w limicie
+// serwera (64 KB) i w jednym String z reserve() obok bufora TLS.
+#define DRAW_MAX_STROKES 40
+#define DRAW_MAX_POINTS 800
+#define DRAW_MIN_POINT_DIST 4   // [px] punkt blizszy niz to od poprzedniego jest odrzucany (probkowanie)
+#define DRAW_PEN_UP_MS 80       // brak dotyku krocej niz to nie konczy linii (chwilowe zaniki XPT2046)
+#define DRAW_PEN_WIDTH 3        // grubosc kreski [px] - taka sama trafia do strokesJson ("width")
+#define DRAW_BTN_DEBOUNCE_MS 250
+#define DRAW_POST_TIMEOUT_MS 7000 // timeout polaczenia i odpowiedzi POST rysunku (body wieksze niz w checkboxach)
+
+// pasek narzedzi: wiersz 1 = Anuluj | 5 kolorow | Zapisz, wiersz 2 = Cofnij | Przywroc | Wyczysc
+#define DRAW_TOOLBAR_H 56
+#define DRAW_ROW_H 28
+#define DRAW_COLOR_COUNT 5
+#define DRAW_COLOR_X0 74
+#define DRAW_COLOR_PITCH 36
+#define DRAW_COLOR_W 32
+#define DRAW_CANCEL_BTN_W 64
+#define DRAW_SAVE_BTN_X 256
+#define DRAW_SAVE_BTN_W 64
+#define DRAW_UNDO_BTN_X 0
+#define DRAW_REDO_BTN_X 108
+#define DRAW_CLEAR_BTN_X 216
+#define DRAW_ROW2_BTN_W 104
+
+// obszar rysowania (biale tlo, pod paskiem) i pasek statusu pod nim; wspolrzedne kresek zapisujemy
+// wzgledem lewego-gornego rogu obszaru, a canvasWidth/canvasHeight w JSON to jego rozmiar
+#define DRAW_AREA_X 0
+#define DRAW_AREA_Y DRAW_TOOLBAR_H
+#define DRAW_AREA_W 320
+#define DRAW_AREA_H 172
+#define DRAW_STATUS_Y (DRAW_AREA_Y + DRAW_AREA_H)
+#define DRAW_STATUS_H 12
 
 #define MAX_NOTES 20
 

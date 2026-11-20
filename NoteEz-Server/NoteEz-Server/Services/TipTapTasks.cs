@@ -84,5 +84,54 @@ namespace NoteEz_Server.Services
 
             return (SetTaskStatus.Ok, root.ToJsonString(WriteOptions));
         }
+
+        // Dopisuje na koncu dokumentu wezel {"type":"drawingBlock","attrs":{"drawingId":"<guid>"}} -
+        // dzieki niemu aplikacja www pokazuje rysunek (sam wiersz NoteDrawing nie wystarcza).
+        // - pusta/null tresc -> nowy dokument zawierajacy tylko blok rysunku,
+        // - stara tresc nie bedaca dokumentem TipTap (zwykly tekst) -> dokument z akapitem na kazda
+        //   linie tekstu + blok rysunku (tekst nie ginie),
+        // - dokument TipTap -> reszta bez zmian, blok dopisany na koncu tablicy "content".
+        public static string AppendDrawingBlock(string? json, Guid drawingId)
+        {
+            var block = new JsonObject
+            {
+                ["type"] = "drawingBlock",
+                ["attrs"] = new JsonObject { ["drawingId"] = drawingId.ToString() }
+            };
+
+            JsonObject root;
+            var parsed = ParseDocument(json);
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                root = NewDocument();
+            }
+            else if (parsed is not null && TypeOf(parsed) == "doc")
+            {
+                root = parsed;
+                if (root["content"] is not JsonArray)
+                    root["content"] = new JsonArray();
+            }
+            else
+            {
+                root = NewDocument();
+                var paragraphs = (JsonArray)root["content"]!;
+                foreach (var line in json!.Replace("\r\n", "\n").Split('\n'))
+                {
+                    var paragraph = new JsonObject { ["type"] = "paragraph" };
+                    if (line.Length > 0)
+                        paragraph["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = line });
+                    paragraphs.Add(paragraph);
+                }
+            }
+
+            ((JsonArray)root["content"]!).Add(block);
+            return root.ToJsonString(WriteOptions);
+        }
+
+        private static JsonObject NewDocument() => new()
+        {
+            ["type"] = "doc",
+            ["content"] = new JsonArray()
+        };
     }
 }

@@ -123,3 +123,62 @@ GPIO0 (empirycznie zarezerwowany przez SPI2_HOST — psuje dotyk mimo braku jawn
   zwarcie pinu do GND) była kluczowa do znalezienia realnych przyczyn — nie zgadywanie.
 - Projekt jest **skończony pod względem liczby pinów** — każdy kolejny czujnik/peryferal
   wymaga zwolnienia jakiegoś istniejącego (jak SHT40 SCL → zwolnienie GPIO1 pod baterię).
+
+---
+
+# Aktualizacja 2026-11-20 — pogoda jako wykresy, checkboxy, nowy rysunek
+
+Zmergowane do `develop` (PR #4 pogoda, #5 checkboxy, #8 rysunek; PR #6 konfiguracja nginx/deploy jest też w `main`).
+Stan na koniec: `develop` = wszystkie trzy funkcje, `main` = jeszcze bez rysunku. **Nic z tego nie zostało sprawdzone na
+urządzeniu przez asystenta** (brak sprzętu) — zweryfikowane są tylko kompilacja i testy backendu.
+
+## Stan firmware
+
+- Płytka: ESP32-C6, 4 MB flash, `huge_app`, brak OTA. Deep sleep zostaje (light sleep porzucony 2026-11-18).
+- Build `develop` (z rysunkiem): flash **1 404 704 B (44%)**, RAM statyczny **51 904 B (15%)**. Przed funkcjami z tej sesji:
+  1 389 KB i 50 KB.
+- Struktura: `NoteEz-ESP32/src/{screens,network,display,sensors,battery,buzzer}`; nowe: `screens/DrawingEditScreen.*`.
+  Ekrany (`State.h`): `SCREEN_LIST, SCREEN_DETAIL, SCREEN_DRAWING, SCREEN_DRAW_EDIT, SCREEN_WEATHER, SCREEN_TIMER`.
+  Z `State.h` zniknęło `detailHasDrawing` (przycisk „Rys.” jest zawsze widoczny).
+
+## Co dodano (szczegóły: `NoteEz-ESP32/notes/README.md`, API: `docs/ESP32_DEVICE_API.md`)
+
+1. **Pogoda jako wykresy** — dwa wykresy (temperatura °C linią, opady mm słupkami) rysowane prymitywami LovyanGFX, bez
+   sprite'a. Okno godzinowe domyślnie 06–18, strzałki na dole przesuwają o 3 h (start 0…11), strzałki na górze zmieniają dzień.
+   Wpis godziny 4 B zamiast `String`+2×`float`, filtr ArduinoJson. Zakres okna: znaczący fragment dnia i szczyt temperatury.
+2. **Większy tekst + checkboxy** — `DETAIL_TEXT_SCALE 1.5` (10 linii na stronę zamiast 11), checkbox jako klikalny kwadrat,
+   obszar dotyku min. 32 px, optymistyczna aktualizacja z cofnięciem po błędzie. Backend: `taskIndex` w `textBlocks`
+   (obsługa zagnieżdżonych tasków), `PUT /api/device-notes/{id}/tasks/{index}` (idempotentny, `{checked}`).
+3. **Nowy rysunek** — „Rys.” zawsze widoczny; „Nowy rysunek” wewnątrz ekranu rysunków; edytor z 5 kolorami, Cofnij/Przywróć/
+   Wyczyść/Zapisz/Anuluj, limity 40 linii/800 punktów; zapis `POST /api/device-notes/{id}/drawings`, backend dopisuje
+   do notatki węzeł `drawingBlock`, żeby aplikacja webowa pokazała rysunek.
+
+## Decyzje i znane ograniczenia
+
+- Żądania HTTP są krótkie, **bez automatycznych ponowień** (blokują dotyk); błąd → komunikat/cofnięcie + ręczne ponowienie.
+- Zapis rysunku nie jest idempotentny (zgubiona odpowiedź + ponowienie = duplikat). Edytor nie blokuje usypiania: po 60 s
+  bez dotyku niezapisany rysunek przepada (świadomie nie zmieniono logiki snu).
+- Zmiana z urządzenia ustawia nowy `RowVersion`, więc notatka otwarta w edytorze www dostaje przy następnym zapisie `409`
+  (w notatkach grupowych dodatkowo baner przez SignalR). Powtórka przy kolizji `RowVersion` nie jest przetestowana na Postgresie
+  (testy używają InMemory).
+- Zagnieżdżone zadania nie mają wcięcia na ekranie; zadania zagnieżdżone w `bulletList`/`blockquote` nie są wyświetlane.
+
+## Do sprawdzenia na urządzeniu (nieprzetestowane)
+
+- **Checkboxy:** wygląd i czytelność fontu ×1,5; dotyk w zadania jedno- i wielolinijkowe, po przewinięciu, zagnieżdżone;
+  szybkie podwójne stuknięcie; błąd sieci (stan wraca, dwa piski); notatka ze starą zwykłą treścią; domena (HTTPS) i surowy IP (HTTP).
+- **Rysunek:** „Brak rysunkow” i „Nowy rysunek”; 5 kolorów; Cofnij/Przywróć; limity 40/800; zapis z siecią i bez; ciągłe
+  rysowanie >60 s nie usypia; rysunek widoczny w aplikacji www (także w notatce ze starą treścią); stabilność sterty
+  przy rysunkach bliskich limitu.
+- **Pogoda:** dzień bez opadów (oś 0–2 mm) i z deszczem, temperatury ujemne, przyciski godzinowe, reset okna przy zmianie dnia,
+  stabilność po kilku odświeżeniach.
+
+## Praca i wdrażanie
+
+- Każda funkcja była robiona na osobnym branchu od `develop` w osobnym `git worktree`; `develop` to bufor przed `main`.
+- `scripts/flash.ps1` — kompilacja + wgrywanie z ustalonymi opcjami płytki i stałym katalogiem budowania. Po zmianie zestawu
+  plików/gałęzi kompilacja bywa pełna (zmierzone 4–8 min), przy zwykłej edycji ok. 13–16 s.
+- `scripts/run-local-backend.sh` — backend z dowolnego worktree jako zwykły proces (Git Bash, nie WSL), z konfiguracją z `.env`
+  (jak w `docker-compose.yml`); do testów urządzenia z lokalnym serwerem (`IP:port`, potem ponowne parowanie z produkcją).
+- Deploy backendu na Oracle VM jest ręczny: `docs/DEPLOY_BACKEND.md` (decyzja: VM śledzi `main`; frontend buduje się sam
+  na Cloudflare z `main`). Zmiany z tej sesji nie wymagają migracji bazy.

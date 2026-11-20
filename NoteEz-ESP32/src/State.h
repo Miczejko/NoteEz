@@ -32,7 +32,7 @@ extern int listScrollRow; // indeks pierwszej widocznej notatki na liscie
 extern unsigned long lastActivityMillis; // czas ostatniego dotkniecia - do usypiania po bezczynnosci
 
 // ---- ekran szczegółów notatki ----
-enum Screen { SCREEN_LIST, SCREEN_DETAIL, SCREEN_DRAWING, SCREEN_WEATHER, SCREEN_TIMER };
+enum Screen { SCREEN_LIST, SCREEN_DETAIL, SCREEN_DRAWING, SCREEN_DRAW_EDIT, SCREEN_WEATHER, SCREEN_TIMER };
 extern Screen currentScreen;
 
 // ---- minutnik (patrz TimerScreen.h) ----
@@ -54,7 +54,6 @@ struct DetailLine {
 };
 
 extern String detailTitle;
-extern bool detailHasDrawing;
 extern bool detailHasAudio;
 extern std::vector<DetailLine> detailLines;
 extern int detailScrollLine;
