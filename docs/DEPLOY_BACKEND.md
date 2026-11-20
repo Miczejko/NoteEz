@@ -58,6 +58,8 @@ docker compose -f docker-compose.prod.yml restart nginx   # bez tego nginx moze 
 
 ## Automatyczny deploy i healthcheck (`scripts/deploy-backend.sh`, cron na VM)
 
+Praktyczny przewodnik krok po kroku (komendy, logi, znaczenie wpisow, migracje, powrot): [../NoteEz-Server/DEPLOY_GUIDE.md](../NoteEz-Server/DEPLOY_GUIDE.md).
+
 Skrypt uruchamiany z crona co 5 minut (bez kluczy SSH w GitHubie i bez procesu stale dzialajacego w tle; sprawdzenie
 galezi to jedno `git fetch`). Przy kazdym uruchomieniu:
 - jest nowy commit na sledzonej galezi (domyslnie `main`) -> `git` fast-forward, `up -d --build`, restart nginx, kontrola
