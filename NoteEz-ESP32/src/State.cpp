@@ -24,7 +24,6 @@ unsigned long timerRemainingMs = 0;
 int timerLastDisplayedSec = -1;
 
 String detailTitle;
-bool detailHasDrawing = false;
 bool detailHasAudio = false;
 std::vector<DetailLine> detailLines;
 int detailScrollLine = 0;
