@@ -26,6 +26,10 @@ docker-compose.override.yml
 .env.*.local
 .env.bak*
 *.env.bak*
+# produkcyjne sekrety (na VM) i ich kopie zapasowe - szablon .env.prod.example zostaje w repo
+.env.prod
+.env.prod.*
+!.env.prod.example
 appsettings.Development.json
 appsettings.Local.json
 **/secrets.json
