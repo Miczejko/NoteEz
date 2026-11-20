@@ -1,6 +1,6 @@
 #include "Buzzer.h"
 #include <Arduino.h>
-#include "Config.h"
+#include "../../Config.h"
 
 void initBuzzer() {
   pinMode(BUZZER_PIN, OUTPUT);

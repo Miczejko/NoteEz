@@ -2,12 +2,12 @@
 #include <esp_sleep.h>
 #include <driver/gpio.h>
 #include <WiFi.h>
-#include "Display.h"
+#include "display/Display.h"
 #include "Colors.h"
-#include "Config.h"
+#include "../Config.h"
 #include "State.h"
 #include "UiHelpers.h"
-#include "NotesScreen.h"
+#include "screens/NotesScreen.h"
 
 // Light sleep budzi sie z DOWOLNEGO GPIO (gpio_wakeup_enable), bez ograniczenia do domeny
 // LP-IO i bez niskopoziomowych zaleznosci ktore w deep sleep mogly nie byc poprawnie

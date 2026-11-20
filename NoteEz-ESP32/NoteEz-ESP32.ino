@@ -4,19 +4,19 @@
 #include <driver/gpio.h>
 
 #include "Config.h"
-#include "Colors.h"
-#include "Display.h"
-#include "State.h"
-#include "UiHelpers.h"
-#include "WifiPairing.h"
-#include "SleepMode.h"
-#include "NotesScreen.h"
-#include "NoteDetailScreen.h"
-#include "DrawingScreen.h"
-#include "ClimateSensor.h"
-#include "WeatherScreen.h"
-#include "TimerScreen.h"
-#include "Buzzer.h"
+#include "src/Colors.h"
+#include "src/display/Display.h"
+#include "src/State.h"
+#include "src/UiHelpers.h"
+#include "src/network/WifiPairing.h"
+#include "src/SleepMode.h"
+#include "src/screens/NotesScreen.h"
+#include "src/screens/NoteDetailScreen.h"
+#include "src/screens/DrawingScreen.h"
+#include "src/sensors/ClimateSensor.h"
+#include "src/screens/WeatherScreen.h"
+#include "src/screens/TimerScreen.h"
+#include "src/buzzer/Buzzer.h"
 
 void setup() {
   Serial.begin(115200);
@@ -26,6 +26,8 @@ void setup() {
   // ESP_SLEEP_WAKEUP_GPIO (touch zadzialal) / ESP_SLEEP_WAKEUP_UNDEFINED (zwykly reset/power-on).
   esp_sleep_wakeup_cause_t wakeupCause = esp_sleep_get_wakeup_cause();
   Serial.printf("[boot] przyczyna wybudzenia: %d\n", (int)wakeupCause);
+  // Diagnostyka restartow: 15 (ESP_RST_BROWNOUT) = spadek napiecia zasilania
+  Serial.printf("[boot] przyczyna resetu: %d (1=power-on, 3=SW, 4=panic, 15=brownout)\n", (int)esp_reset_reason());
 
   initBuzzer();
   if (wakeupCause == ESP_SLEEP_WAKEUP_GPIO) {
@@ -75,7 +77,17 @@ void setup() {
   wm.setAPCallback(configModeCallback);
   wm.setConfigPortalTimeout(180); // po 3 min bez konfiguracji restart i kolejna proba
 
+  // Mniejszy pobor pradu przy starcie radia: sciemnione podswietlenie + nizsza moc nadawania.
+  analogWrite(BACKLIGHT_PIN, BACKLIGHT_DIM_DURING_WIFI);
+  WiFi.mode(WIFI_STA);
+  WiFi.setTxPower(WIFI_TX_POWER);
+  delay(100); // chwila na ustabilizowanie zasilania po wlaczeniu radia
+
   bool connected = wm.autoConnect("Notatnik-ESP32");
+
+  // przywrocenie pelnego podswietlenia (pinMode odlacza PWM, dalej zwykle sterowanie cyfrowe)
+  pinMode(BACKLIGHT_PIN, OUTPUT);
+  digitalWrite(BACKLIGHT_PIN, HIGH);
 
   if (!connected) {
     buzzError();
@@ -98,7 +110,7 @@ void setup() {
   Serial.println("apiHost: " + apiHost);
 
   showMessage("Polaczono!", WiFi.localIP().toString().c_str(), COLOR_ACCENT_MINT);
-  delay(1000);
+  delay(300);
 
   // jesli w portalu wpisano kod parowania - sparuj urzadzenie zanim wejdziemy do glownego ekranu
   String enteredCode = String(pairingCodeParam->getValue());
@@ -119,6 +131,7 @@ void loop() {
   int32_t x, y;
   static uint32_t resetTouchStart = 0;
   static uint32_t lastScrollTap = 0;
+  static bool touchReleased = true; // true tylko dopoki palec byl uniesiony od ostatniej petli
 
   bool touched = display.getTouch(&x, &y);
 
@@ -128,6 +141,7 @@ void loop() {
 
   if (!touched) {
     resetTouchStart = 0;
+    touchReleased = true;
     // Light sleep test wypadl dobrze (patrz historia w git) - docelowy tryb to deep sleep,
     // bo oszczedza duzo wiecej energii (restartuje caly chip zamiast trzymac go w stanie
     // wstrzymania). Po wybudzeniu kod wraca do setup() od zera - display.init() sam zajmuje
@@ -144,6 +158,11 @@ void loop() {
   }
 
   lastActivityMillis = millis();
+
+  // "swieze" dotkniecie = pierwsza petla po uniesieniu palca. Przytrzymany palec (albo palec
+  // z poprzedniego ekranu, np. po wejsciu do notatki) nie przelacza checkboxow wielokrotnie.
+  bool freshTouch = touchReleased;
+  touchReleased = false;
 
   if (currentScreen == SCREEN_LIST) {
     if (pointInRect(x, y, REFRESH_BTN_X, REFRESH_BTN_Y, REFRESH_BTN_W, REFRESH_BTN_H)) {
@@ -223,6 +242,13 @@ void loop() {
         lastScrollTap = millis();
       }
     }
+
+    // obszar tresci (nad przyciskami gora/dol, pod paskiem Wstecz/Rys.) - dotkniecie checkboxa
+    if (freshTouch && y >= DETAIL_CONTENT_TOP && y < DETAIL_CONTENT_BOTTOM) {
+      tapDetailContent(y);
+      delay(200); // debounce
+      return;
+    }
   } else if (currentScreen == SCREEN_WEATHER) {
     if (pointInRect(x, y, BACK_BTN_X, BACK_BTN_Y, BACK_BTN_W, BACK_BTN_H)) {
       renderNotesList();
@@ -250,10 +276,10 @@ void loop() {
 
     if (millis() - lastScrollTap > 180) { // debounce przewijania, ale pozwala trzymac palec
       if (pointInRect(x, y, SCROLL_UP_BTN_X, SCROLL_BTN_Y, SCROLL_BTN_W, SCROLL_BTN_H)) {
-        scrollWeather(-1);
+        shiftWeatherWindow(-WEATHER_WINDOW_STEP);
         lastScrollTap = millis();
       } else if (pointInRect(x, y, SCROLL_DOWN_BTN_X, SCROLL_BTN_Y, SCROLL_BTN_W, SCROLL_BTN_H)) {
-        scrollWeather(1);
+        shiftWeatherWindow(WEATHER_WINDOW_STEP);
         lastScrollTap = millis();
       }
     }

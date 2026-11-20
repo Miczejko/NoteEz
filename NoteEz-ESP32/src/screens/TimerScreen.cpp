@@ -1,10 +1,10 @@
 #include "TimerScreen.h"
-#include "Display.h"
-#include "Colors.h"
-#include "Config.h"
-#include "State.h"
-#include "UiHelpers.h"
-#include "Buzzer.h"
+#include "../display/Display.h"
+#include "../Colors.h"
+#include "../../Config.h"
+#include "../State.h"
+#include "../UiHelpers.h"
+#include "../buzzer/Buzzer.h"
 
 static void drawTimerHeader(const char* title) {
   display.fillScreen(COLOR_BG);

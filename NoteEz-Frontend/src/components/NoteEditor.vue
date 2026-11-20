@@ -8,6 +8,7 @@ import TaskItem from '@tiptap/extension-task-item'
 import { DrawingBlock } from '../tiptap/drawingBlock'
 import { MentionHighlight } from '../tiptap/mentionHighlight'
 import ToolbarIcon from './ToolbarIcon.vue'
+import { useRecentColors } from '../utils/recentColors'
 
 const props = defineProps({
   modelValue: { type: [String, Object], default: null },
@@ -60,6 +61,41 @@ function toggleMentionMenu() {
 function insertMention(username) {
   editor.value?.chain().focus().insertContent(`@${username} `).run()
   showMentionMenu.value = false
+}
+
+// Wybor koloru tekstu: gotowa paleta + ostatnio uzywane + wlasny kolor.
+const PRESET_COLORS = [
+  '#000000', '#6b7280', '#d64545', '#e08a2c', '#e0c93c', '#3f9b5a',
+  '#3aa0a0', '#3468c0', '#54428e', '#c04590', '#8b5a2b', '#ffffff',
+]
+const { recentColors, addRecentColor } = useRecentColors()
+const showColorMenu = ref(false)
+
+function applyColor(color) {
+  editor.value?.chain().focus().setColor(color).run()
+  addRecentColor(color)
+  showColorMenu.value = false
+}
+
+// Wlasny kolor: natywny picker tylko zmienia roboczy kolor (draft) - nic nie jest
+// stosowane ani nie zamyka menu, dopoki nie klikniesz "Zastosuj". Dzieki temu mozna
+// spokojnie dopracowac odcien (zadnego focus() na edytorze, ktory by przerywal picker).
+const customDraft = ref('#000000')
+
+function toggleColorMenu() {
+  showColorMenu.value = !showColorMenu.value
+  if (showColorMenu.value) {
+    customDraft.value = editor.value?.getAttributes('textStyle').color || '#000000'
+  }
+}
+
+function applyCustomColor() {
+  applyColor(customDraft.value)
+}
+
+function resetColor() {
+  editor.value?.chain().focus().unsetColor().run()
+  showColorMenu.value = false
 }
 
 watch(
@@ -156,23 +192,58 @@ onBeforeUnmount(() => {
         </div>
       </span>
       <span class="divider" />
-      <label class="color-picker" :style="{ '--swatch': editor.getAttributes('textStyle').color || 'transparent' }">
-        A
-        <input
-          type="color"
-          :value="editor.getAttributes('textStyle').color || '#000000'"
-          @input="editor.chain().focus().setColor($event.target.value).run()"
-        />
-      </label>
-      <button
-        v-if="editor.getAttributes('textStyle').color"
-        type="button"
-        class="color-reset"
-        title="Usuń kolor"
-        @click="editor.chain().focus().unsetColor().run()"
-      >
-        ×
-      </button>
+      <span class="color-wrap">
+        <button
+          type="button"
+          class="color-trigger"
+          title="Kolor tekstu"
+          :style="{ '--swatch': editor.getAttributes('textStyle').color || 'transparent' }"
+          @mousedown.prevent
+          @click="toggleColorMenu"
+        >
+          A
+        </button>
+        <div v-if="showColorMenu" class="mention-backdrop" @click="showColorMenu = false" />
+        <div v-if="showColorMenu" class="color-menu card">
+          <div class="color-grid">
+            <button
+              v-for="color in PRESET_COLORS"
+              :key="color"
+              type="button"
+              class="color-swatch"
+              :class="{ active: editor.getAttributes('textStyle').color?.toLowerCase() === color }"
+              :style="{ background: color }"
+              :title="color"
+              @mousedown.prevent
+              @click="applyColor(color)"
+            />
+          </div>
+          <template v-if="recentColors.length">
+            <div class="color-menu-label">Ostatnio użyte</div>
+            <div class="color-grid">
+              <button
+                v-for="color in recentColors"
+                :key="color"
+                type="button"
+                class="color-swatch"
+                :style="{ background: color }"
+                :title="color"
+                @mousedown.prevent
+                @click="applyColor(color)"
+              />
+            </div>
+          </template>
+          <div class="color-menu-actions">
+            <label class="color-custom" title="Wybierz własny kolor">
+              <span class="color-custom-dot" :style="{ background: customDraft }" />
+              Własny…
+              <input type="color" v-model="customDraft" />
+            </label>
+            <button type="button" class="color-apply" @mousedown.prevent @click="applyCustomColor">Zastosuj</button>
+          </div>
+          <button type="button" class="color-clear" @mousedown.prevent @click="resetColor">Domyślny kolor</button>
+        </div>
+      </span>
     </div>
     <EditorContent :editor="editor" class="editor-content input-field" />
     <div class="keyboard-spacer" aria-hidden="true" />
@@ -290,39 +361,110 @@ onBeforeUnmount(() => {
   margin: 0 0.25rem;
 }
 
-.color-picker {
+.color-wrap {
   position: relative;
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 1.85rem;
+}
+
+.toolbar .color-trigger {
   font-size: 0.8125rem;
   font-weight: 700;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  cursor: pointer;
+  color: var(--color-text);
   box-shadow: inset 0 -3px 0 0 var(--swatch, transparent);
 }
 
-.color-picker input[type='color'] {
+.color-menu {
+  position: absolute;
+  top: calc(100% + 0.375rem);
+  right: 0;
+  z-index: 151;
+  width: 13rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.625rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.375rem;
+}
+
+.toolbar .color-swatch {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+}
+
+.toolbar .color-swatch:hover {
+  transform: scale(1.1);
+}
+
+.toolbar .color-swatch.active {
+  border-color: var(--color-secondary);
+  box-shadow: 0 0 0 2px var(--color-secondary);
+}
+
+.color-menu-label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.color-menu-actions {
+  display: flex;
+  gap: 0.375rem;
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.5rem;
+}
+
+.color-custom-dot {
+  display: inline-block;
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  vertical-align: -2px;
+  margin-right: 0.25rem;
+}
+
+.toolbar .color-apply {
+  flex: 1;
+  width: auto;
+  height: auto;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--color-text);
+}
+
+.color-custom {
+  position: relative;
+  flex: 1;
+  text-align: center;
+  font-size: 0.8125rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.color-custom input[type='color'] {
   position: absolute;
   inset: 0;
   opacity: 0;
   cursor: pointer;
 }
 
-.color-reset {
-  width: 1.5rem;
-  min-width: 1.5rem;
-  padding: 0.3rem;
-  font-size: 0.9375rem;
-  line-height: 1;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
+.toolbar .color-clear {
+  width: 100%;
+  height: auto;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--color-text);
 }
 
 .editor-content {

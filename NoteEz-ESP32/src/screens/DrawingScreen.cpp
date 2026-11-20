@@ -1,10 +1,10 @@
 #include "DrawingScreen.h"
 #include <ArduinoJson.h>
-#include "Display.h"
-#include "Colors.h"
-#include "Config.h"
-#include "State.h"
-#include "UiHelpers.h"
+#include "../display/Display.h"
+#include "../Colors.h"
+#include "../../Config.h"
+#include "../State.h"
+#include "../UiHelpers.h"
 
 // rysunki sa przechowywane jako lista pociagniec (linie miedzy punktami), nie jako bitmapy,
 // wiec renderujemy je wprost jako polaczone odcinki przeskalowane pod rozmiar ekranu

@@ -21,6 +21,13 @@
 // bo tylko GO/wylaczamy je - nie budzimy sie przez niego).
 #define BACKLIGHT_PIN 10
 
+// Ograniczenie poboru pradu przy starcie WiFi (pik pradu radia powodowal brownout/restarty).
+// Podswietlenie jest sciemnione (PWM 0-255) na czas laczenia z WiFi, potem wraca na pelna jasnosc.
+// Moc nadawania WiFi jest obnizona na stale - jesli zasieg bedzie za maly, wybierz WIFI_POWER_15dBm
+// albo wieksza (domyslnie ESP32 ma ok. 20 dBm).
+#define BACKLIGHT_DIM_DURING_WIFI 40
+#define WIFI_TX_POWER WIFI_POWER_11dBm
+
 // Czujnik temperatury/wilgotnosci SHT40 (I2C bitbangowane, SoftI2C - patrz ClimateSensor.h).
 // Biblioteka Wire psula dzielona magistrale SPI dotyku/wyswietlacza (nawet nieuzywana!),
 // dlatego I2C jest tu zaimplementowane recznie na zwyklych GPIO, bez Wire.h.
@@ -94,8 +101,23 @@
 #define LIST_CONTENT_BOTTOM 200 // ponizej tego zaczynaja sie przyciski scrolla listy
 
 #define DETAIL_CONTENT_TOP 40
-#define DETAIL_LINE_HEIGHT 14
 #define DETAIL_CONTENT_BOTTOM 200 // ponizej tego zaczynaja sie przyciski scrolla
+
+// Tekst notatki: font wbudowany 6x8 skalowany x1.5 -> znak 9x12 px (dawniej 6x8 przy skali 1).
+// Wiersz 16 px = 10 linii na strone (dawniej 11 linii po 14 px).
+#define DETAIL_TEXT_SCALE 1.5f
+#define DETAIL_CHAR_W 9
+#define DETAIL_LINE_HEIGHT 16
+#define DETAIL_MARGIN_X 10
+
+// Checkbox (task) w tresci notatki: kwadrat 14 px + odstep, tekst zawiniety z wcieciem.
+// Cala "kolumna" taska (min. DETAIL_TASK_MIN_LINES wierszy = 32 px) jest obszarem dotyku,
+// wiec jednoliniowy task dostaje dodatkowy pusty wiersz - kompromis: 5 jednoliniowych taskow
+// albo 10 linii zwyklego tekstu na strone.
+#define DETAIL_TASK_BOX 14
+#define DETAIL_TASK_INDENT 20
+#define DETAIL_TASK_MIN_LINES 2
+#define TASK_PUT_TIMEOUT_MS 4500 // timeout polaczenia i odpowiedzi PUT zmiany checkboxa
 
 // ---- ekran pogody (Open-Meteo, https://open-meteo.com - bez klucza API) ----
 // Na sztywno Bialystok - docelowo do wyboru w portalu konfiguracyjnym WiFi
@@ -128,9 +150,24 @@
 
 #define WEATHER_CLIMATE_Y 62
 
-#define WEATHER_LIST_START_Y 80
-#define WEATHER_ROW_HEIGHT 18
-#define WEATHER_CONTENT_BOTTOM 200 // ponizej tego zaczynaja sie przyciski scrolla
+// okno godzinowe wykresow: 13 punktow (np. 06:00-18:00), przesuwane o 3 h w zakresie 0-23
+#define WEATHER_WINDOW_HOURS 12          // rozpietosc okna (13 punktow: start..start+12)
+#define WEATHER_WINDOW_DEFAULT_START 6   // domyslnie 06:00-18:00 (dzien aktywny + szczyt temp.)
+#define WEATHER_WINDOW_STEP 3
+#define WEATHER_WINDOW_MAX_START (23 - WEATHER_WINDOW_HOURS)
+
+// geometria wykresow (320x240, rysowane prymitywami, bez sprite'a)
+#define WEATHER_CHART_X0 34              // lewa krawedz pola wykresu (miejsce na podpisy osi Y)
+#define WEATHER_CHART_X1 306             // prawa krawedz pola wykresu
+#define WEATHER_TEMP_TITLE_Y 74
+#define WEATHER_TEMP_TOP 84
+#define WEATHER_TEMP_BOTTOM 128
+#define WEATHER_PRECIP_TITLE_Y 134
+#define WEATHER_PRECIP_TOP 144
+#define WEATHER_PRECIP_BOTTOM 182
+#define WEATHER_XLABEL_Y 186
+#define WEATHER_TEMP_MIN_SPAN 4          // minimalny zakres osi temperatury [C]
+#define WEATHER_PRECIP_MIN_AXIS 2        // minimalny zakres osi opadow [mm]
 
 // ---- ekran timera (minutnik, patrz TimerScreen.h) ----
 #define TIMER_MIN_MINUTES 1

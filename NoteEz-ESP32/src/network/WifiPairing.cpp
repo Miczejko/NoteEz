@@ -2,11 +2,11 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
-#include "Display.h"
-#include "Colors.h"
-#include "State.h"
-#include "UiHelpers.h"
-#include "Buzzer.h"
+#include "../display/Display.h"
+#include "../Colors.h"
+#include "../State.h"
+#include "../UiHelpers.h"
+#include "../buzzer/Buzzer.h"
 
 void configModeCallback(WiFiManager* myWiFiManager) {
   display.fillScreen(COLOR_BG);
