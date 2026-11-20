@@ -64,7 +64,24 @@ docker compose -f docker-compose.prod.yml restart nginx   # bez tego nginx moze 
 
 ## Lokalne testy z urzadzeniem
 
-Backend z innego worktree uruchamiaj jako zwykly proces z tymi samymi zmiennymi, ktore `docker-compose.yml`
-mapuje z `NoteEz-Server/.env` (`Jwt__Key`, `ConnectionStrings__DefaultConnection` z hostem `localhost`, `Cors__...`,
-`Turnstile__SecretKey` itd.), na `--urls http://0.0.0.0:5112`. Urzadzenie paruje sie wtedy z adresem `IP_komputera:5112`
-i po testach trzeba je ponownie sparowac z produkcja.
+Backend z dowolnego worktree uruchom skryptem (Git Bash, NIE WSL - w zwyklym `cmd` samo `bash` odpala WSL):
+
+```
+"C:\Program Files\Git\bin\bash.exe" scripts/run-local-backend.sh [katalog_worktree]
+```
+
+`dotnet run` sam nie ma konfiguracji (JWT, baza, CORS, Turnstile), bo w Dockerze dostarcza ja `docker-compose.yml`
+ze zmiennych w `NoteEz-Server/.env`. Skrypt ustawia te same zmienne (bez wypisywania wartosci), zamienia host bazy
+`postgres-noteez` na `localhost` i startuje backend na `0.0.0.0:5112`. Wymaga dzialajacego kontenera `postgres-noteez`.
+`.env` jest w `.gitignore`, wiec w nowym worktree go nie ma - skrypt bierze go z glownego worktree.
+
+Frontend: dla zmian tylko w backendzie/firmware wystarczy uruchomic Vite z glownego katalogu i nadpisac adres API
+zmienna srodowiskowa (ma priorytet nad `.env`): `$env:VITE_API_URL="http://localhost:5112/api"; npm run dev` (trasy
+backendu sa pod `/api`; bez tego frontend trafia przez proxy w Docker na port 8080). Po zmianie `.env` restart Vite.
+
+Urzadzenie paruje sie wtedy z adresem `IP_komputera:5112` (sprawdz `ipconfig`, adres moze sie zmienic; Windows moze
+wymagac reguly zapory dla portu 5112) i po testach trzeba je ponownie sparowac z produkcja (`noteez.online`).
+
+## Firmware ESP32
+
+Wgrywanie: `.\scripts\flash.ps1 -Port COMx` (szczegoly w `NoteEz-ESP32/notes/README.md`). Firmware nie wdraza sie przez merge.
