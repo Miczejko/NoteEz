@@ -99,9 +99,9 @@ Uzytkownik crona musi uruchamiac `docker` bez `sudo` (sprawdz `docker ps`). Logi
 4. Gdy dziala: zmerguj `develop` do `main` i **dopiero wtedy** ustaw `BRANCH=main` (albo usun plik konfiguracji - domyslnie `main`).
    Jesli `main` bylby jeszcze za `develop`, skrypt nie cofnie produkcji (zabezpieczenie), tylko zapisze to w logu.
 
-Testy skryptu na tymczasowym repo z atrapami `docker`/`curl`: `bash scripts/tests/test-deploy-backend.sh` (36 sprawdzen:
+Testy skryptu na tymczasowym repo z atrapami `docker`/`curl`: `bash scripts/tests/test-deploy-backend.sh` (55 sprawdzen:
 brak zmian, commit tylko we frontendzie, build, rollback po zlym zdrowiu, brak ponawiania zlego commita, migracja,
-`--force`, brudne drzewo, odzyskiwanie po awarii, `--dry-run`, zmiana galezi, brak cofania). **Nie testowano na prawdziwej VM.**
+`--force`, brudne drzewo, odzyskiwanie po awarii, `--dry-run`, zmiana galezi, brak cofania, inna linia historii, rozjazd po recznym pullu, `--rebuild`). **Nie testowano na prawdziwej VM.**
 
 ## Sprawdzenie po deployu
 
