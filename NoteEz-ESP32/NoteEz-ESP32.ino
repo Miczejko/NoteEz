@@ -131,6 +131,7 @@ void loop() {
   int32_t x, y;
   static uint32_t resetTouchStart = 0;
   static uint32_t lastScrollTap = 0;
+  static bool touchReleased = true; // true tylko dopoki palec byl uniesiony od ostatniej petli
 
   bool touched = display.getTouch(&x, &y);
 
@@ -140,6 +141,7 @@ void loop() {
 
   if (!touched) {
     resetTouchStart = 0;
+    touchReleased = true;
     // Light sleep test wypadl dobrze (patrz historia w git) - docelowy tryb to deep sleep,
     // bo oszczedza duzo wiecej energii (restartuje caly chip zamiast trzymac go w stanie
     // wstrzymania). Po wybudzeniu kod wraca do setup() od zera - display.init() sam zajmuje
@@ -156,6 +158,11 @@ void loop() {
   }
 
   lastActivityMillis = millis();
+
+  // "swieze" dotkniecie = pierwsza petla po uniesieniu palca. Przytrzymany palec (albo palec
+  // z poprzedniego ekranu, np. po wejsciu do notatki) nie przelacza checkboxow wielokrotnie.
+  bool freshTouch = touchReleased;
+  touchReleased = false;
 
   if (currentScreen == SCREEN_LIST) {
     if (pointInRect(x, y, REFRESH_BTN_X, REFRESH_BTN_Y, REFRESH_BTN_W, REFRESH_BTN_H)) {
@@ -234,6 +241,13 @@ void loop() {
         scrollDetail(detailLinesPerPage() / 2 + 1);
         lastScrollTap = millis();
       }
+    }
+
+    // obszar tresci (nad przyciskami gora/dol, pod paskiem Wstecz/Rys.) - dotkniecie checkboxa
+    if (freshTouch && y >= DETAIL_CONTENT_TOP && y < DETAIL_CONTENT_BOTTOM) {
+      tapDetailContent(y);
+      delay(200); // debounce
+      return;
     }
   } else if (currentScreen == SCREEN_WEATHER) {
     if (pointInRect(x, y, BACK_BTN_X, BACK_BTN_Y, BACK_BTN_W, BACK_BTN_H)) {

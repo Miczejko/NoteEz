@@ -253,6 +253,43 @@ namespace NoteEz_Server.Services
             return (ToDto(note, note.User?.Username ?? ""), mentions);
         }
 
+        // Idempotentnie ustawia stan checkboxa (taskItem o danym indeksie w kolejnosci dokumentu)
+        // w TipTap JSON notatki - uzywane przez ESP32. Zmienia tylko attrs.checked, a UpdatedAt i
+        // RowVersion odswieza tak samo jak zwykly zapis (patrz UpdateAsync), wiec otwarty edytor www
+        // wykryje zmiane (konflikt RowVersion przy jego nastepnym zapisie).
+        public async Task<(SetTaskStatus Status, Guid? GroupId)> SetTaskCheckedAsync(Guid userId, Guid noteId, int taskIndex, bool isChecked)
+        {
+            // Jedna ponowna proba przy wyscigu z innym zapisem: przelaczenie jest idempotentne,
+            // wiec bezpiecznie mozna je zastosowac drugi raz na swiezo wczytanej tresci.
+            for (var attempt = 0; ; attempt++)
+            {
+                var note = await _db.Notes.FirstOrDefaultAsync(n => n.Id == noteId);
+                if (note is null || !await CanEditAsync(userId, note))
+                    return (SetTaskStatus.NotFound, null);
+
+                var (status, newJson) = TipTapTasks.SetChecked(note.TextContent, taskIndex, isChecked);
+                if (status != SetTaskStatus.Ok) return (status, null);
+
+                note.TextContent = newJson;
+                note.UpdatedAt = DateTime.UtcNow;
+                note.RowVersion = NewRowVersion();
+
+                try
+                {
+                    await _db.SaveChangesAsync();
+                    return (SetTaskStatus.Ok, note.GroupId);
+                }
+                catch (DbUpdateConcurrencyException) when (attempt == 0)
+                {
+                    _db.Entry(note).State = EntityState.Detached;
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    throw new ConcurrencyConflictException();
+                }
+            }
+        }
+
         public async Task<bool> DeleteAsync(Guid userId, Guid noteId)
         {
             var note = await _db.Notes.FirstOrDefaultAsync(n => n.Id == noteId);

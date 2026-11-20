@@ -48,6 +48,9 @@ struct DetailLine {
   String text;
   uint16_t color;
   bool bold; // "pogrubienie" robione tanim trikiem: dwukrotny wydruk przesuniety o 1px
+  int16_t taskIndex; // indeks taska w dokumencie (z backendu) albo -1 dla zwyklej linii
+  bool checked;      // stan checkboxa - taki sam na wszystkich liniach jednego taska
+  bool taskStart;    // pierwsza linia taska (tu rysowany jest kwadrat checkboxa)
 };
 
 extern String detailTitle;
