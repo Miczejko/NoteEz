@@ -135,9 +135,24 @@
 
 #define WEATHER_CLIMATE_Y 62
 
-#define WEATHER_LIST_START_Y 80
-#define WEATHER_ROW_HEIGHT 18
-#define WEATHER_CONTENT_BOTTOM 200 // ponizej tego zaczynaja sie przyciski scrolla
+// okno godzinowe wykresow: 13 punktow (np. 06:00-18:00), przesuwane o 3 h w zakresie 0-23
+#define WEATHER_WINDOW_HOURS 12          // rozpietosc okna (13 punktow: start..start+12)
+#define WEATHER_WINDOW_DEFAULT_START 6   // domyslnie 06:00-18:00 (dzien aktywny + szczyt temp.)
+#define WEATHER_WINDOW_STEP 3
+#define WEATHER_WINDOW_MAX_START (23 - WEATHER_WINDOW_HOURS)
+
+// geometria wykresow (320x240, rysowane prymitywami, bez sprite'a)
+#define WEATHER_CHART_X0 34              // lewa krawedz pola wykresu (miejsce na podpisy osi Y)
+#define WEATHER_CHART_X1 306             // prawa krawedz pola wykresu
+#define WEATHER_TEMP_TITLE_Y 74
+#define WEATHER_TEMP_TOP 84
+#define WEATHER_TEMP_BOTTOM 128
+#define WEATHER_PRECIP_TITLE_Y 134
+#define WEATHER_PRECIP_TOP 144
+#define WEATHER_PRECIP_BOTTOM 182
+#define WEATHER_XLABEL_Y 186
+#define WEATHER_TEMP_MIN_SPAN 4          // minimalny zakres osi temperatury [C]
+#define WEATHER_PRECIP_MIN_AXIS 2        // minimalny zakres osi opadow [mm]
 
 // ---- ekran timera (minutnik, patrz TimerScreen.h) ----
 #define TIMER_MIN_MINUTES 1
