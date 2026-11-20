@@ -56,6 +56,51 @@ docker compose -f docker-compose.prod.yml restart nginx   # bez tego nginx moze 
   (pelna komenda w notatkach projektu). Zmiany bez migracji (np. nowy endpoint) tego kroku nie wymagaja.
 - Powrot: `git checkout <zapisany commit>`, ten sam `up -d --build` i restart nginx.
 
+## Automatyczny deploy i healthcheck (`scripts/deploy-backend.sh`, cron na VM)
+
+Skrypt uruchamiany z crona co 5 minut (bez kluczy SSH w GitHubie i bez procesu stale dzialajacego w tle; sprawdzenie
+galezi to jedno `git fetch`). Przy kazdym uruchomieniu:
+- jest nowy commit na sledzonej galezi (domyslnie `main`) -> `git` fast-forward, `up -d --build`, restart nginx, kontrola
+  zdrowia; **przy bledzie wraca do poprzedniego commitu** (rollback) i zapamietuje zly commit (nie ponawia go w kolko),
+- commity, ktore nie dotykaja `NoteEz-Server/` (frontend, firmware, docs), tylko aktualizuja checkout - bez budowania,
+- brak nowych commitow -> sam healthcheck; gdy cos nie dziala, probuje `docker compose up -d` i restart nginx.
+
+Healthcheck: 3 kontenery dzialaja (`noteez-api`, `noteez-postgres`, `noteez-nginx`) ORAZ `GET /api/device-notes/lite`
+z bledny kluczem `X-Api-Key` przez nginx zwraca **401**. To dobry sygnal, bo handler klucza odpytuje baze: 401 = nginx, API
+i Postgres dzialaja; przy awarii bazy byloby 500, przy padnietym API 502/brak polaczenia.
+
+Zabezpieczenia (skrypt nic nie robi i zapisuje powod w logu): lokalne zmiany w repo na VM; malo miejsca na dysku
+(`MIN_FREE_MB`, domyslnie 1500); **nowa migracja bazy** w diffie (migracje zostaja reczne - po recznym kroku
+`scripts/deploy-backend.sh --force`); **sledzona galaz jest ZA biezacym commitem** (nie cofa produkcji bez `--force`).
+
+### Instalacja na VM (jednorazowo)
+
+```
+cd <katalog repo>
+git pull                                    # skrypt musi byc w checkoucie na VM
+scripts/deploy-backend.sh --status          # galaz, commit, zdrowie, ostatnie logi
+scripts/deploy-backend.sh --dry-run         # co by zrobil, niczego nie zmieniajac
+crontab -e                                  # dopisz linie:
+*/5 * * * * <katalog repo>/scripts/deploy-backend.sh >/dev/null 2>&1
+```
+Uzytkownik crona musi uruchamiac `docker` bez `sudo` (sprawdz `docker ps`). Logi: `~/.noteez-deploy/deploy.log`
+(zapisywane sa tylko zdarzenia). Opcjonalna konfiguracja w `~/.noteez-deploy.conf` (zwykly plik bash):
+`BRANCH=main`, `NOTIFY_URL=...` (powiadomienia: POST tekstu, np. ntfy.sh; adres `discord.com/api/webhooks` tez dziala),
+`HEALTH_HOST`, `MIN_FREE_MB`. Bez `NOTIFY_URL` skrypt nie wysyla nic na zewnatrz.
+
+### Test przed merge'em do `main`
+
+1. Na VM przejdz na `develop` (zeby miec skrypt) i ustaw sledzenie `develop`:
+   `git fetch origin && git checkout develop && git pull --ff-only origin develop`, potem w `~/.noteez-deploy.conf`: `BRANCH=develop`.
+2. `--status` i `--dry-run`, potem dopisz crona. **Od tej chwili kazdy push na `develop` wdraza backend na produkcje w ciagu 5 minut.**
+3. Wypchnij drobna zmiane w `NoteEz-Server/` na `develop` i obserwuj `~/.noteez-deploy/deploy.log` (spodziewane: `START deploy`, `OK wdrozono`).
+4. Gdy dziala: zmerguj `develop` do `main` i **dopiero wtedy** ustaw `BRANCH=main` (albo usun plik konfiguracji - domyslnie `main`).
+   Jesli `main` bylby jeszcze za `develop`, skrypt nie cofnie produkcji (zabezpieczenie), tylko zapisze to w logu.
+
+Testy skryptu na tymczasowym repo z atrapami `docker`/`curl`: `bash scripts/tests/test-deploy-backend.sh` (36 sprawdzen:
+brak zmian, commit tylko we frontendzie, build, rollback po zlym zdrowiu, brak ponawiania zlego commita, migracja,
+`--force`, brudne drzewo, odzyskiwanie po awarii, `--dry-run`, zmiana galezi, brak cofania). **Nie testowano na prawdziwej VM.**
+
 ## Sprawdzenie po deployu
 
 - Zaloguj sie w aplikacji i wykonaj zmiane dotykajaca nowej funkcji.
