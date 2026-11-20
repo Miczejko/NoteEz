@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
+using NoteEz_Server.Hubs;
 using NoteEz_Server.Models;
 using NoteEz_Server.Services;
 using System.Security.Claims;
@@ -18,13 +20,22 @@ namespace NoteEz_Server.Controllers
         IReadOnlyList<NoteAudioDto> AudioClips
     );
 
+    // "checked" jest nullable, zeby brak pola dalo sie odrzucic jawnym 400 (a nie cicho potraktowac jako false).
+    public record SetTaskCheckedRequest(bool? Checked);
+
     [ApiController]
     [Route("api/device-notes")]
     [Authorize(AuthenticationSchemes = "DeviceApiKey")]
     public class DeviceNotesController : ControllerBase
     {
         private readonly NoteService _notes;
-        public DeviceNotesController(NoteService notes) => _notes = notes;
+        private readonly IHubContext<AppHub> _hub;
+
+        public DeviceNotesController(NoteService notes, IHubContext<AppHub> hub)
+        {
+            _notes = notes;
+            _hub = hub;
+        }
 
         private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
@@ -50,6 +61,44 @@ namespace NoteEz_Server.Controllers
                 note.UpdatedAt,
                 note.Drawings,
                 note.AudioClips));
+        }
+
+        // Idempotentne ustawienie stanu checkboxa (nie toggle): ponowienie tego samego zadania
+        // daje ten sam wynik. Zwraca 200 + { "checked": bool } (aktualny stan), zeby urzadzenie
+        // moglo go porownac ze stanem narysowanym optymistycznie.
+        [HttpPut("{id}/tasks/{index:int}")]
+        public async Task<IActionResult> SetTaskChecked(Guid id, int index, [FromBody] SetTaskCheckedRequest req)
+        {
+            if (req.Checked is not bool isChecked)
+                return BadRequest(new { error = "Pole 'checked' (bool) jest wymagane." });
+
+            try
+            {
+                var (status, groupId) = await _notes.SetTaskCheckedAsync(UserId, id, index, isChecked);
+                switch (status)
+                {
+                    case SetTaskStatus.NotFound:
+                        return NotFound();
+                    case SetTaskStatus.InvalidContent:
+                        return BadRequest(new { error = "Notatka nie ma tresci w formacie edytora (brak checkboxow)." });
+                    case SetTaskStatus.IndexOutOfRange:
+                        return BadRequest(new { error = "Nieprawidlowy indeks zadania." });
+                }
+
+                // Tak jak przy zapisie z aplikacji www: notatki grupowe rozsylaja NoteChanged,
+                // zeby otwarty edytor innego uzytkownika pokazal baner o zmianie.
+                if (groupId is not null)
+                {
+                    await _hub.Clients.Group($"group-{groupId}").SendAsync("NoteChanged", new { noteId = id, changeType = "updated" });
+                    await _hub.Clients.Group($"note-{id}").SendAsync("NoteChanged", new { noteId = id, changeType = "updated" });
+                }
+
+                return Ok(new { @checked = isChecked });
+            }
+            catch (ConcurrencyConflictException)
+            {
+                return Conflict(new { error = "Notatka zostala zmieniona przez kogos innego. Sprobuj ponownie." });
+            }
         }
 
         // Authorize in the future with device API key, but for now, we will allow any device to delete notes

@@ -1,10 +1,12 @@
 using System.Text;
-using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace NoteEz_Server.Services
 {
     // A single line of device-renderable text with just enough formatting for the ESP32 to draw.
-    public record TextBlockDto(string Type, string Text, bool? Checked, string? Color, bool Bold);
+    // TaskIndex is set only for taskItem blocks: the task's position in document order (see
+    // TipTapTasks). All paragraphs of one task share the same TaskIndex.
+    public record TextBlockDto(string Type, string Text, bool? Checked, string? Color, bool Bold, int? TaskIndex = null);
 
     // Flattens TipTap document JSON into a simple block list the ESP32 firmware can render
     // (bold, a single text color, and checkbox state) without having to parse the full TipTap schema.
@@ -16,54 +18,45 @@ namespace NoteEz_Server.Services
             if (string.IsNullOrWhiteSpace(tiptapJson))
                 return blocks;
 
-            JsonDocument doc;
-            try
-            {
-                doc = JsonDocument.Parse(tiptapJson);
-            }
-            catch (JsonException)
+            var root = TipTapTasks.ParseDocument(tiptapJson);
+            if (root is null)
             {
                 // Legacy plain-text note.
                 blocks.Add(new TextBlockDto("paragraph", tiptapJson, null, null, false));
                 return blocks;
             }
 
-            using (doc)
-            {
-                if (doc.RootElement.TryGetProperty("content", out var top) && top.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var node in top.EnumerateArray())
-                        WalkBlock(node, blocks);
-                }
-            }
+            // Numeracja taskow pochodzi ze wspolnej funkcji (ta sama, ktorej uzywa endpoint
+            // przelaczania), wiec indeks wyslany do ESP32 zawsze wskazuje ten sam task.
+            var taskIndexes = new Dictionary<JsonObject, int>(ReferenceEqualityComparer.Instance);
+            var items = TipTapTasks.EnumerateTaskItems(root);
+            for (var i = 0; i < items.Count; i++) taskIndexes[items[i]] = i;
+
+            foreach (var node in TipTapTasks.Children(root))
+                WalkBlock(node, blocks, taskIndexes);
 
             return blocks;
         }
 
-        private static void WalkBlock(JsonElement node, List<TextBlockDto> blocks)
+        private static void WalkBlock(JsonObject node, List<TextBlockDto> blocks, Dictionary<JsonObject, int> taskIndexes)
         {
-            if (node.ValueKind != JsonValueKind.Object || !node.TryGetProperty("type", out var typeEl))
-                return;
-
-            switch (typeEl.GetString())
+            var type = TipTapTasks.TypeOf(node);
+            switch (type)
             {
                 case "paragraph":
                 case "heading":
                     {
                         var (text, color, bold) = ExtractRuns(node);
                         if (text.Length > 0)
-                            blocks.Add(new TextBlockDto("paragraph", text, null, color, bold || typeEl.GetString() == "heading"));
+                            blocks.Add(new TextBlockDto("paragraph", text, null, color, bold || type == "heading"));
                         break;
                     }
                 case "blockquote":
-                    if (node.TryGetProperty("content", out var bqContent) && bqContent.ValueKind == JsonValueKind.Array)
+                    foreach (var child in TipTapTasks.Children(node))
                     {
-                        foreach (var child in bqContent.EnumerateArray())
-                        {
-                            var (text, color, bold) = ExtractRuns(child);
-                            if (text.Length > 0)
-                                blocks.Add(new TextBlockDto("blockquote", text, null, color, bold));
-                        }
+                        var (text, color, bold) = ExtractRuns(child);
+                        if (text.Length > 0)
+                            blocks.Add(new TextBlockDto("blockquote", text, null, color, bold));
                     }
                     break;
                 case "codeBlock":
@@ -74,22 +67,18 @@ namespace NoteEz_Server.Services
                         break;
                     }
                 case "bulletList":
-                    if (node.TryGetProperty("content", out var blContent))
-                        foreach (var item in blContent.EnumerateArray())
-                            WalkListItem(item, blocks, ordered: false, number: 0);
+                    foreach (var item in TipTapTasks.Children(node))
+                        WalkListItem(item, blocks, ordered: false, number: 0);
                     break;
                 case "orderedList":
-                    if (node.TryGetProperty("content", out var olContent))
                     {
                         var number = 1;
-                        foreach (var item in olContent.EnumerateArray())
+                        foreach (var item in TipTapTasks.Children(node))
                             WalkListItem(item, blocks, ordered: true, number: number++);
+                        break;
                     }
-                    break;
                 case "taskList":
-                    if (node.TryGetProperty("content", out var tlContent))
-                        foreach (var item in tlContent.EnumerateArray())
-                            WalkTaskItem(item, blocks);
+                    WalkTaskList(node, blocks, taskIndexes);
                     break;
                 default:
                     // drawingBlock and anything else unsupported on-device: no text.
@@ -97,13 +86,10 @@ namespace NoteEz_Server.Services
             }
         }
 
-        private static void WalkListItem(JsonElement item, List<TextBlockDto> blocks, bool ordered, int number)
+        private static void WalkListItem(JsonObject item, List<TextBlockDto> blocks, bool ordered, int number)
         {
-            if (!item.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.Array)
-                return;
-
             var first = true;
-            foreach (var para in content.EnumerateArray())
+            foreach (var para in TipTapTasks.Children(item))
             {
                 var (text, color, bold) = ExtractRuns(para);
                 if (text.Length == 0) continue;
@@ -114,66 +100,71 @@ namespace NoteEz_Server.Services
             }
         }
 
-        private static void WalkTaskItem(JsonElement item, List<TextBlockDto> blocks)
+        private static void WalkTaskList(JsonObject taskList, List<TextBlockDto> blocks, Dictionary<JsonObject, int> taskIndexes)
         {
-            bool? isChecked = item.TryGetProperty("attrs", out var attrs)
-                && attrs.TryGetProperty("checked", out var ch)
-                && (ch.ValueKind == JsonValueKind.True || ch.ValueKind == JsonValueKind.False)
-                ? ch.GetBoolean()
-                : null;
-
-            if (!item.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.Array)
-                return;
-
-            foreach (var para in content.EnumerateArray())
+            foreach (var item in TipTapTasks.Children(taskList))
             {
-                var (text, color, bold) = ExtractRuns(para);
+                if (TipTapTasks.TypeOf(item) == "taskItem")
+                    WalkTaskItem(item, blocks, taskIndexes);
+            }
+        }
+
+        private static void WalkTaskItem(JsonObject item, List<TextBlockDto> blocks, Dictionary<JsonObject, int> taskIndexes)
+        {
+            bool? isChecked = item["attrs"]?["checked"] is JsonValue v && v.TryGetValue<bool>(out var b) ? b : null;
+            int? taskIndex = taskIndexes.TryGetValue(item, out var idx) ? idx : null;
+
+            // Tresc taska to paragrafy (wszystkie dziela ten sam taskIndex) oraz - przy
+            // TaskItem nested:true w edytorze - zagniezdzone taskList, ktore dostaja wlasne indeksy.
+            foreach (var child in TipTapTasks.Children(item))
+            {
+                if (TipTapTasks.TypeOf(child) == "taskList")
+                {
+                    WalkTaskList(child, blocks, taskIndexes);
+                    continue;
+                }
+
+                var (text, color, bold) = ExtractRuns(child);
                 if (text.Length == 0) continue;
-                blocks.Add(new TextBlockDto("taskItem", text, isChecked, color, bold));
+                blocks.Add(new TextBlockDto("taskItem", text, isChecked, color, bold, taskIndex));
             }
         }
 
         // Flattens a paragraph-like node's inline content into one string, plus the block's
         // overall color (first non-null textStyle color found) and bold (true if any run is bold).
-        private static (string text, string? color, bool bold) ExtractRuns(JsonElement node)
+        private static (string text, string? color, bool bold) ExtractRuns(JsonObject node)
         {
             var sb = new StringBuilder();
             string? color = null;
             var bold = false;
 
-            if (node.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.Array)
+            foreach (var child in TipTapTasks.Children(node))
             {
-                foreach (var child in content.EnumerateArray())
+                var ctype = TipTapTasks.TypeOf(child);
+
+                if (ctype == "hardBreak")
                 {
-                    if (!child.TryGetProperty("type", out var ct)) continue;
-                    var ctype = ct.GetString();
+                    sb.Append(' ');
+                    continue;
+                }
+                if (ctype != "text") continue;
 
-                    if (ctype == "hardBreak")
+                if (child["text"] is JsonValue tv && tv.TryGetValue<string>(out var t))
+                    sb.Append(t);
+
+                if (child["marks"] is JsonArray marks)
+                {
+                    foreach (var mark in marks)
                     {
-                        sb.Append(' ');
-                        continue;
-                    }
-                    if (ctype != "text") continue;
+                        var mtype = TipTapTasks.TypeOf(mark);
 
-                    if (child.TryGetProperty("text", out var textEl))
-                        sb.Append(textEl.GetString());
+                        if (mtype == "bold") bold = true;
 
-                    if (child.TryGetProperty("marks", out var marks) && marks.ValueKind == JsonValueKind.Array)
-                    {
-                        foreach (var mark in marks.EnumerateArray())
+                        if (mtype == "textStyle"
+                            && mark?["attrs"]?["color"] is JsonValue cv
+                            && cv.TryGetValue<string>(out var c))
                         {
-                            if (!mark.TryGetProperty("type", out var mt)) continue;
-                            var mtype = mt.GetString();
-
-                            if (mtype == "bold") bold = true;
-
-                            if (mtype == "textStyle"
-                                && mark.TryGetProperty("attrs", out var markAttrs)
-                                && markAttrs.TryGetProperty("color", out var colorEl)
-                                && colorEl.ValueKind == JsonValueKind.String)
-                            {
-                                color ??= colorEl.GetString();
-                            }
+                            color ??= c;
                         }
                     }
                 }

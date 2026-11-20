@@ -190,5 +190,158 @@ namespace NoteEz_Server.Tests.Unit
             Assert.Equal(2, julyNotes.Count);
             Assert.All(julyNotes, n => Assert.Equal(7, n.ScheduledDate.Month));
         }
-    }
+    
+        // ---- SetTaskCheckedAsync (przelaczanie checkboxow z ESP32) ----
+
+        // taski: "Kup mleko" (0, niezaznaczony), zagniezdzony "Pelne" (1, niezaznaczony), "Chleb" (2, zaznaczony)
+        private const string TasksDoc =
+            """{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Zażółć"}]},""" +
+            """{"type":"taskList","content":[""" +
+            """{"type":"taskItem","attrs":{"checked":false},"content":[{"type":"paragraph","content":[{"type":"text","text":"Kup mleko"}]},""" +
+            """{"type":"taskList","content":[{"type":"taskItem","attrs":{"checked":false},"content":[{"type":"paragraph","content":[{"type":"text","text":"Pelne"}]}]}]}]},""" +
+            """{"type":"taskItem","attrs":{"checked":true},"content":[{"type":"paragraph","content":[{"type":"text","text":"Chleb"}]}]}]}]}""";
+
+        private static async Task<Guid> CreateNoteAsync(NoteService service, Guid owner, string? textContent)
+        {
+            var (dto, _) = await service.CreateAsync(owner, new CreateNoteRequest("T", textContent, null, null, null));
+            return dto.Id;
+        }
+
+        private static List<bool?> CheckedStates(string? json) =>
+            TipTapBlockExtractor.Extract(json).Where(b => b.Type == "taskItem").Select(b => b.Checked).ToList();
+
+        [Fact]
+        public async Task SetTaskCheckedAsync_SetsOnlyTargetTask_AndLeavesRestOfDocumentUntouched()
+        {
+            await using var db = NewDb();
+            var service = NewNoteService(db);
+            var owner = await NewUserAsync(db);
+            var id = await CreateNoteAsync(service, owner, TasksDoc);
+
+            var (status, _) = await service.SetTaskCheckedAsync(owner, id, 1, true); // zagniezdzony
+
+            Assert.Equal(SetTaskStatus.Ok, status);
+            var stored = (await db.Notes.SingleAsync()).TextContent;
+            Assert.Equal(new List<bool?> { false, true, true }, CheckedStates(stored));
+            // reszta dokumentu bez zmian (w tym polskie znaki, bez \uXXXX): cofniecie tej jednej flagi
+            // daje tekst identyczny z oryginalem co do znaku
+            Assert.Equal(TasksDoc, TipTapTasks.SetChecked(stored, 1, false).NewJson);
+        }
+
+        [Fact]
+        public async Task SetTaskCheckedAsync_CanUncheck()
+        {
+            await using var db = NewDb();
+            var service = NewNoteService(db);
+            var owner = await NewUserAsync(db);
+            var id = await CreateNoteAsync(service, owner, TasksDoc);
+
+            var (status, _) = await service.SetTaskCheckedAsync(owner, id, 2, false);
+
+            Assert.Equal(SetTaskStatus.Ok, status);
+            Assert.Equal(new List<bool?> { false, false, false }, CheckedStates((await db.Notes.SingleAsync()).TextContent));
+        }
+
+        [Fact]
+        public async Task SetTaskCheckedAsync_IsIdempotent()
+        {
+            await using var db = NewDb();
+            var service = NewNoteService(db);
+            var owner = await NewUserAsync(db);
+            var id = await CreateNoteAsync(service, owner, TasksDoc);
+
+            await service.SetTaskCheckedAsync(owner, id, 0, true);
+            var afterFirst = (await db.Notes.SingleAsync()).TextContent;
+            var (status, _) = await service.SetTaskCheckedAsync(owner, id, 0, true);
+
+            Assert.Equal(SetTaskStatus.Ok, status);
+            Assert.Equal(afterFirst, (await db.Notes.SingleAsync()).TextContent);
+            Assert.Equal(new List<bool?> { true, false, true }, CheckedStates(afterFirst));
+        }
+
+        [Fact]
+        public async Task SetTaskCheckedAsync_RefreshesUpdatedAtAndRowVersion()
+        {
+            await using var db = NewDb();
+            var service = NewNoteService(db);
+            var owner = await NewUserAsync(db);
+            var id = await CreateNoteAsync(service, owner, TasksDoc);
+            var before = await db.Notes.AsNoTracking().SingleAsync();
+            await Task.Delay(20);
+
+            await service.SetTaskCheckedAsync(owner, id, 0, true);
+
+            var after = await db.Notes.AsNoTracking().SingleAsync();
+            Assert.True(after.UpdatedAt > before.UpdatedAt);
+            Assert.NotEqual(before.RowVersion, after.RowVersion);
+        }
+
+        [Fact]
+        public async Task SetTaskCheckedAsync_OtherUsersNote_ReturnsNotFoundAndDoesNotModify()
+        {
+            await using var db = NewDb();
+            var service = NewNoteService(db);
+            var owner = await NewUserAsync(db);
+            var attacker = await NewUserAsync(db);
+            var id = await CreateNoteAsync(service, owner, TasksDoc);
+            var before = await db.Notes.AsNoTracking().SingleAsync();
+
+            var (status, _) = await service.SetTaskCheckedAsync(attacker, id, 0, true);
+
+            Assert.Equal(SetTaskStatus.NotFound, status);
+            var after = await db.Notes.AsNoTracking().SingleAsync();
+            Assert.Equal(before.TextContent, after.TextContent);
+            Assert.Equal(before.RowVersion, after.RowVersion);
+        }
+
+        [Fact]
+        public async Task SetTaskCheckedAsync_UnknownNote_ReturnsNotFound()
+        {
+            await using var db = NewDb();
+            var service = NewNoteService(db);
+            var owner = await NewUserAsync(db);
+
+            var (status, _) = await service.SetTaskCheckedAsync(owner, Guid.NewGuid(), 0, true);
+
+            Assert.Equal(SetTaskStatus.NotFound, status);
+        }
+
+        [Theory]
+        [InlineData(-1)]
+        [InlineData(3)]
+        [InlineData(100)]
+        public async Task SetTaskCheckedAsync_IndexOutOfRange_ReturnsStatusAndDoesNotModify(int index)
+        {
+            await using var db = NewDb();
+            var service = NewNoteService(db);
+            var owner = await NewUserAsync(db);
+            var id = await CreateNoteAsync(service, owner, TasksDoc);
+            var before = await db.Notes.AsNoTracking().SingleAsync();
+
+            var (status, _) = await service.SetTaskCheckedAsync(owner, id, index, true);
+
+            Assert.Equal(SetTaskStatus.IndexOutOfRange, status);
+            var after = await db.Notes.AsNoTracking().SingleAsync();
+            Assert.Equal(before.TextContent, after.TextContent);
+            Assert.Equal(before.RowVersion, after.RowVersion);
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("stara zwykla tresc")]
+        [InlineData("42")]
+        public async Task SetTaskCheckedAsync_NotTipTapContent_ReturnsInvalidContent(string? content)
+        {
+            await using var db = NewDb();
+            var service = NewNoteService(db);
+            var owner = await NewUserAsync(db);
+            var id = await CreateNoteAsync(service, owner, content);
+
+            var (status, _) = await service.SetTaskCheckedAsync(owner, id, 0, true);
+
+            Assert.Equal(SetTaskStatus.InvalidContent, status);
+            Assert.Equal(content, (await db.Notes.SingleAsync()).TextContent);
+        }
+}
 }

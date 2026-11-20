@@ -101,8 +101,23 @@
 #define LIST_CONTENT_BOTTOM 200 // ponizej tego zaczynaja sie przyciski scrolla listy
 
 #define DETAIL_CONTENT_TOP 40
-#define DETAIL_LINE_HEIGHT 14
 #define DETAIL_CONTENT_BOTTOM 200 // ponizej tego zaczynaja sie przyciski scrolla
+
+// Tekst notatki: font wbudowany 6x8 skalowany x1.5 -> znak 9x12 px (dawniej 6x8 przy skali 1).
+// Wiersz 16 px = 10 linii na strone (dawniej 11 linii po 14 px).
+#define DETAIL_TEXT_SCALE 1.5f
+#define DETAIL_CHAR_W 9
+#define DETAIL_LINE_HEIGHT 16
+#define DETAIL_MARGIN_X 10
+
+// Checkbox (task) w tresci notatki: kwadrat 14 px + odstep, tekst zawiniety z wcieciem.
+// Cala "kolumna" taska (min. DETAIL_TASK_MIN_LINES wierszy = 32 px) jest obszarem dotyku,
+// wiec jednoliniowy task dostaje dodatkowy pusty wiersz - kompromis: 5 jednoliniowych taskow
+// albo 10 linii zwyklego tekstu na strone.
+#define DETAIL_TASK_BOX 14
+#define DETAIL_TASK_INDENT 20
+#define DETAIL_TASK_MIN_LINES 2
+#define TASK_PUT_TIMEOUT_MS 4500 // timeout polaczenia i odpowiedzi PUT zmiany checkboxa
 
 // ---- ekran pogody (Open-Meteo, https://open-meteo.com - bez klucza API) ----
 // Na sztywno Bialystok - docelowo do wyboru w portalu konfiguracyjnym WiFi
