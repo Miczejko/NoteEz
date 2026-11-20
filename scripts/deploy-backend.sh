@@ -165,6 +165,10 @@ main() {
       # wdrozenie cofnelo by produkcje do starszego kodu, wiec nic nie robimy bez --force
       log "POMINIETO: origin/$BRANCH ($NEW_SHORT) jest ZA biezacym commitem ($OLD_SHORT) - nie cofam produkcji (zmerguj zmiany do $BRANCH albo uzyj --force)"
       notify "Pominieto: $BRANCH ($NEW_SHORT) jest starszy niz wdrozony kod ($OLD_SHORT)"
+    elif ! git cat-file -e "origin/$BRANCH:scripts/deploy-backend.sh" 2>/dev/null; then
+      # przelaczenie na galaz bez tego skryptu usunelo by go z VM razem z cronem (checkout podmienia pliki)
+      log "POMINIETO: origin/$BRANCH nie zawiera scripts/deploy-backend.sh - nie przelaczam (zmerguj skrypt do $BRANCH)"
+      notify "Pominieto: $BRANCH nie zawiera skryptu deploy, nie przelaczam galezi"
     elif [ -n "$(git status --porcelain --untracked-files=no)" ]; then
       log "POMINIETO deploy $NEW_SHORT: drzewo git na VM ma lokalne zmiany (git status)"
       notify "Deploy $NEW_SHORT pominiety: lokalne zmiany w repo na VM"
@@ -217,7 +221,9 @@ main() {
           fi
         fi
       else
-        log "BLAD: nie mozna przelaczyc na $BRANCH / fast-forward do $NEW_SHORT (rozjechana historia?)"
+        log "BLAD: nie mozna przelaczyc na $BRANCH / fast-forward do $NEW_SHORT (rozjechana historia?) - wracam na poprzednia galaz"
+        # nie zostawiamy VM na innej galezi (mogla by nie miec tego skryptu)
+        if [ -n "$OLD_BRANCH" ]; then git checkout -q -B "$OLD_BRANCH" "$OLD" 2>/dev/null; else git checkout -q --detach "$OLD" 2>/dev/null; fi
         printf '%s' "$NEW" > "$BLOCKED_FILE"
         notify "Deploy $NEW_SHORT nieudany: git nie moze zrobic fast-forward"
       fi

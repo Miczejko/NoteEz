@@ -54,7 +54,7 @@ MIN_FREE_MB=1
 EOF
 
 run() {
-  HOME="$T/home" DEPLOY_CONF="$T/home/conf" PATH="$T/stubs:$PATH" WAIT_INTERVAL=0 WAIT_TRIES=2 \
+  HOME="$T/home" DEPLOY_CONF="${CONF_FILE:-$T/home/conf}" PATH="$T/stubs:$PATH" WAIT_INTERVAL=0 WAIT_TRIES=2 \
     bash "$T/vm/scripts/deploy-backend.sh" "$@" > "$T/last_out.txt" 2>&1
 }
 push_commit() { # plik tresc
@@ -149,6 +149,26 @@ check "log: nie cofam produkcji" "$(grep -q 'ZA biezacym commitem' "$LOG"; echo 
 check "bez --build" "$([ "$(builds)" = "$B12" ]; echo $?)"
 run --force
 check "--force pozwala (przechodzi na main)" "$([ "$(git -C "$T/vm" branch --show-current)" = "main" ]; echo $?)"
+
+echo "S13: galaz sledzona nie zawiera skryptu deploy -> nie przelacza (skrypt zostaje na VM)"
+git -C "$T/seed" checkout -q main 2>/dev/null; git -C "$T/seed" checkout -q -b noscript
+git -C "$T/seed" rm -q scripts/deploy-backend.sh && git -C "$T/seed" commit -q -m "no script" && git -C "$T/seed" push -q origin noscript 2>/dev/null
+sed 's/^BRANCH=.*/BRANCH=noscript/' "$T/home/conf" > "$T/home/conf_noscript"
+git -C "$T/vm" checkout -q main; H13="$(vm_head)"; CONF_FILE="$T/home/conf_noscript" run
+check "galaz bez zmian (main)" "$([ "$(git -C "$T/vm" branch --show-current)" = "main" ]; echo $?)"
+check "HEAD bez zmian" "$([ "$(vm_head)" = "$H13" ]; echo $?)"
+check "skrypt nadal istnieje na VM" "$([ -f "$T/vm/scripts/deploy-backend.sh" ]; echo $?)"
+check "log: nie zawiera skryptu" "$(grep -q 'nie zawiera scripts/deploy-backend.sh' "$LOG"; echo $?)"
+
+echo "S14: nieudany fast-forward -> wraca na poprzednia galaz (nie zostaje na innej)"
+git -C "$T/vm" checkout -q main
+git -C "$T/vm" commit -q --allow-empty -m "local only"            # lokalny main rozjedzie sie z origin/main
+git -C "$T/seed" checkout -q main && push_commit NoteEz-Frontend/f.js diverge
+git -C "$T/vm" checkout -q -b other; H14="$(vm_head)"; run
+check "wrocono na galaz other" "$([ "$(git -C "$T/vm" branch --show-current)" = "other" ]; echo $?)"
+check "HEAD bez zmian" "$([ "$(vm_head)" = "$H14" ]; echo $?)"
+check "skrypt nadal istnieje na VM" "$([ -f "$T/vm/scripts/deploy-backend.sh" ]; echo $?)"
+check "log BLAD przelaczenia" "$(grep -q 'wracam na poprzednia galaz' "$LOG"; echo $?)"
 
 echo; echo "WYNIK: $PASS ok, $FAIL niepowodzen"
 echo "--- log deploy.log:"; cat "$LOG"
