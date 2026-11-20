@@ -262,10 +262,10 @@ void loop() {
 
     if (millis() - lastScrollTap > 180) { // debounce przewijania, ale pozwala trzymac palec
       if (pointInRect(x, y, SCROLL_UP_BTN_X, SCROLL_BTN_Y, SCROLL_BTN_W, SCROLL_BTN_H)) {
-        scrollWeather(-1);
+        shiftWeatherWindow(-WEATHER_WINDOW_STEP);
         lastScrollTap = millis();
       } else if (pointInRect(x, y, SCROLL_DOWN_BTN_X, SCROLL_BTN_Y, SCROLL_BTN_W, SCROLL_BTN_H)) {
-        scrollWeather(1);
+        shiftWeatherWindow(WEATHER_WINDOW_STEP);
         lastScrollTap = millis();
       }
     }
