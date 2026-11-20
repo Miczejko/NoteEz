@@ -190,5 +190,130 @@ namespace NoteEz_Server.Tests.Integration
 
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         }
+
+        // ---- POST /api/device-notes/{id}/drawings (nowy rysunek z urzadzenia) ----
+
+        private const string ValidStrokes =
+            """{"strokes":[{"color":"#2d2640","width":3,"points":[{"x":10,"y":12},{"x":40,"y":55}]}],"canvasWidth":320,"canvasHeight":190}""";
+
+        private static Task<HttpResponseMessage> PostDrawingAsync(HttpClient client, string? apiKey, Guid noteId, string? strokesJson)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, $"/api/device-notes/{noteId}/drawings")
+            {
+                Content = JsonContent.Create(new { strokesJson })
+            };
+            if (apiKey is not null) request.Headers.Add("X-Api-Key", apiKey);
+            return client.SendAsync(request);
+        }
+
+        [Fact]
+        public async Task AddDrawing_WithoutApiKey_ReturnsUnauthorized()
+        {
+            using var factory = new CustomWebApplicationFactory();
+            var client = CreateClient(factory);
+
+            var response = await PostDrawingAsync(client, null, Guid.NewGuid(), ValidStrokes);
+
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task AddDrawing_OtherUsersOrUnknownNote_ReturnsNotFound()
+        {
+            using var factory = new CustomWebApplicationFactory();
+            var client = CreateClient(factory);
+            var ownerJwt = await RegisterAndLoginAsync(client);
+            var noteId = await CreateNoteAsync(client, ownerJwt, TasksDoc);
+            var attackerKey = await PairDeviceAsync(client, await RegisterAndLoginAsync(client));
+
+            Assert.Equal(HttpStatusCode.NotFound, (await PostDrawingAsync(client, attackerKey, noteId, ValidStrokes)).StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, (await PostDrawingAsync(client, attackerKey, Guid.NewGuid(), ValidStrokes)).StatusCode);
+        }
+
+        [Theory]
+        [InlineData("to nie json")]
+        [InlineData("""{"strokes":[]}""")]
+        [InlineData("""{"strokes":[{"color":"#000000","width":3,"points":[{"x":1,"y":1}]}]}""")]
+        [InlineData("""{"strokes":[{"color":"zielony","width":3,"points":[{"x":1,"y":1},{"x":2,"y":2}]}]}""")]
+        [InlineData(null)]
+        public async Task AddDrawing_InvalidStrokes_ReturnsBadRequest(string? strokes)
+        {
+            using var factory = new CustomWebApplicationFactory();
+            var client = CreateClient(factory);
+            var jwt = await RegisterAndLoginAsync(client);
+            var apiKey = await PairDeviceAsync(client, jwt);
+            var noteId = await CreateNoteAsync(client, jwt, TasksDoc);
+
+            var response = await PostDrawingAsync(client, apiKey, noteId, strokes);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task AddDrawing_EmptyBody_ReturnsBadRequest()
+        {
+            using var factory = new CustomWebApplicationFactory();
+            var client = CreateClient(factory);
+            var jwt = await RegisterAndLoginAsync(client);
+            var apiKey = await PairDeviceAsync(client, jwt);
+            var noteId = await CreateNoteAsync(client, jwt, TasksDoc);
+            var request = new HttpRequestMessage(HttpMethod.Post, $"/api/device-notes/{noteId}/drawings")
+            {
+                Content = new StringContent("", Encoding.UTF8, "application/json")
+            };
+            request.Headers.Add("X-Api-Key", apiKey);
+
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.SendAsync(request)).StatusCode);
+        }
+
+        [Fact]
+        public async Task AddDrawing_Success_ReturnsCreatedAndDeviceGetListsNewDrawing()
+        {
+            using var factory = new CustomWebApplicationFactory();
+            var client = CreateClient(factory);
+            var jwt = await RegisterAndLoginAsync(client);
+            var apiKey = await PairDeviceAsync(client, jwt);
+            var noteId = await CreateNoteAsync(client, jwt, TasksDoc);
+
+            var response = await PostDrawingAsync(client, apiKey, noteId, ValidStrokes);
+
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            var created = await response.Content.ReadFromJsonAsync<JsonElement>();
+            var drawingId = created.GetProperty("id").GetGuid();
+            Assert.Equal(ValidStrokes, created.GetProperty("strokesJson").GetString());
+            Assert.Equal(0, created.GetProperty("sortOrder").GetInt32());
+
+            var get = new HttpRequestMessage(HttpMethod.Get, $"/api/device-notes/{noteId}");
+            get.Headers.Add("X-Api-Key", apiKey);
+            var note = await (await client.SendAsync(get)).Content.ReadFromJsonAsync<JsonElement>();
+            var drawings = note.GetProperty("drawings");
+            Assert.Equal(1, drawings.GetArrayLength());
+            Assert.Equal(drawingId, drawings[0].GetProperty("id").GetGuid());
+            Assert.Equal(ValidStrokes, drawings[0].GetProperty("strokesJson").GetString());
+            // tekst notatki i taski nadal widoczne dla urzadzenia
+            Assert.Equal(2, note.GetProperty("textBlocks").EnumerateArray().Count(b => b.GetProperty("type").GetString() == "taskItem"));
+        }
+
+        [Fact]
+        public async Task AddDrawing_WebAppSeesDrawingBlockInTextContent()
+        {
+            using var factory = new CustomWebApplicationFactory();
+            var client = CreateClient(factory);
+            var jwt = await RegisterAndLoginAsync(client);
+            var apiKey = await PairDeviceAsync(client, jwt);
+            var noteId = await CreateNoteAsync(client, jwt, null);
+
+            var response = await PostDrawingAsync(client, apiKey, noteId, ValidStrokes);
+            var drawingId = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetString();
+
+            var get = new HttpRequestMessage(HttpMethod.Get, $"/api/notes/{noteId}");
+            get.Headers.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+            var note = await (await client.SendAsync(get)).Content.ReadFromJsonAsync<JsonElement>();
+            var doc = JsonDocument.Parse(note.GetProperty("textContent").GetString()!);
+            var block = doc.RootElement.GetProperty("content")[0];
+            Assert.Equal("drawingBlock", block.GetProperty("type").GetString());
+            Assert.Equal(drawingId, block.GetProperty("attrs").GetProperty("drawingId").GetString());
+            Assert.Equal(drawingId, note.GetProperty("drawings")[0].GetProperty("id").GetString());
+        }
     }
 }

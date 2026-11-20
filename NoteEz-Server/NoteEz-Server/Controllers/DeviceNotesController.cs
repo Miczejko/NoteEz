@@ -23,11 +23,17 @@ namespace NoteEz_Server.Controllers
     // "checked" jest nullable, zeby brak pola dalo sie odrzucic jawnym 400 (a nie cicho potraktowac jako false).
     public record SetTaskCheckedRequest(bool? Checked);
 
+    // strokesJson to JSON rysunku zapisany jako string (patrz DrawingStrokesValidator); walidacja w serwisie.
+    public record AddDeviceDrawingRequest(string? StrokesJson);
+
     [ApiController]
     [Route("api/device-notes")]
     [Authorize(AuthenticationSchemes = "DeviceApiKey")]
     public class DeviceNotesController : ControllerBase
     {
+        // 64 KB rysunku + narzut na escapowanie cudzyslowow w JSON-owym stringu (~1.3x)
+        private const long MaxRequestBodyBytes = 100_000;
+
         private readonly NoteService _notes;
         private readonly IHubContext<AppHub> _hub;
 
@@ -94,6 +100,41 @@ namespace NoteEz_Server.Controllers
                 }
 
                 return Ok(new { @checked = isChecked });
+            }
+            catch (ConcurrencyConflictException)
+            {
+                return Conflict(new { error = "Notatka zostala zmieniona przez kogos innego. Sprobuj ponownie." });
+            }
+        }
+
+        // Dodaje rysunek z urzadzenia do notatki (patrz NoteService.AddDeviceDrawingAsync): zapis
+        // NoteDrawing + dopisanie bloku drawingBlock do TipTap JSON. 201 + NoteDrawingDto;
+        // 404 cudza/nieistniejaca notatka; 400 niepoprawny rysunek lub przekroczony limit rysunkow;
+        // 409 konflikt wersji (urzadzenie moze ponowic recznie).
+        [HttpPost("{id}/drawings")]
+        [RequestSizeLimit(MaxRequestBodyBytes)]
+        public async Task<IActionResult> AddDrawing(Guid id, [FromBody] AddDeviceDrawingRequest req)
+        {
+            try
+            {
+                var result = await _notes.AddDeviceDrawingAsync(UserId, id, req.StrokesJson);
+                switch (result.Status)
+                {
+                    case AddDeviceDrawingStatus.NotFound:
+                        return NotFound();
+                    case AddDeviceDrawingStatus.InvalidDrawing:
+                    case AddDeviceDrawingStatus.TooManyDrawings:
+                        return BadRequest(new { error = result.Error });
+                }
+
+                // Jak przy SetTaskChecked: notatki grupowe rozsylaja NoteChanged (baner w edytorze www).
+                if (result.GroupId is not null)
+                {
+                    await _hub.Clients.Group($"group-{result.GroupId}").SendAsync("NoteChanged", new { noteId = id, changeType = "updated" });
+                    await _hub.Clients.Group($"note-{id}").SendAsync("NoteChanged", new { noteId = id, changeType = "updated" });
+                }
+
+                return CreatedAtAction(nameof(GetById), new { id }, result.Drawing);
             }
             catch (ConcurrencyConflictException)
             {

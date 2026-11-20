@@ -20,12 +20,25 @@ void renderDrawingScreen(int index) {
   display.setCursor(BACK_BTN_X + 10, BACK_BTN_Y + 12);
   display.print("< Wstecz");
 
+  // "Nowy rysunek" w gornym pasku (pasek ma 32 px - przelaczanie rysunkow dotykiem dziala ponizej)
+  display.fillRoundRect(DRAW_NEW_BTN_X + 4, DRAW_NEW_BTN_Y + 2, DRAW_NEW_BTN_W - 8, DRAW_NEW_BTN_H - 4, 6, COLOR_ACCENT_MINT);
+  display.setTextColor(COLOR_ON_ACCENT);
+  display.setCursor(DRAW_NEW_BTN_X + 10, DRAW_NEW_BTN_Y + 12);
+  display.print("Nowy rysunek");
+
   JsonArray drawings = detailDoc["drawings"].as<JsonArray>();
+  if (drawings.size() == 0) {
+    display.setTextColor(TFT_DARKGREY);
+    display.setTextSize(2);
+    display.setCursor((display.width() - 13 * 12) / 2, 110); // "Brak rysunkow" = 13 znakow x 12 px
+    display.print("Brak rysunkow");
+    return;
+  }
   if (index < 0 || index >= (int)drawings.size()) return;
 
   if (drawings.size() > 1) {
     display.setTextColor(TFT_DARKGREY);
-    display.setCursor(display.width() - 60, 12);
+    display.setCursor(84, 12);
     display.printf("%d/%d (dotknij)", index + 1, (int)drawings.size());
   }
 

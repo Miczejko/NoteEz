@@ -9,6 +9,14 @@ namespace NoteEz_Server.Services
 
     public record MentionNotification(Guid UserId, Notification Notification);
 
+    public enum AddDeviceDrawingStatus { Ok, NotFound, InvalidDrawing, TooManyDrawings }
+
+    public record AddDeviceDrawingResult(
+        AddDeviceDrawingStatus Status,
+        NoteDrawingDto? Drawing = null,
+        Guid? GroupId = null,
+        string? Error = null);
+
     public class NoteService
     {
         private readonly AppDbContext _db;
@@ -17,6 +25,7 @@ namespace NoteEz_Server.Services
         // Te same znaki co dozwolone w nazwie uzytkownika przy rejestracji (RegisterDto).
         private static readonly Regex MentionRegex = new(@"@([A-Za-z0-9_.-]{3,32})", RegexOptions.Compiled);
         private const int MentionThrottleSeconds = 60;
+        public const int MaxDrawingsPerNote = 20; // limit dla rysunkow dodawanych z urzadzenia
 
         public NoteService(AppDbContext db, NoteAudioService audioService)
         {
@@ -282,6 +291,61 @@ namespace NoteEz_Server.Services
                 catch (DbUpdateConcurrencyException) when (attempt == 0)
                 {
                     _db.Entry(note).State = EntityState.Detached;
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    throw new ConcurrencyConflictException();
+                }
+            }
+        }
+
+        // Dodaje rysunek z urzadzenia (ESP32) do istniejacej notatki: waliduje strokesJson, tworzy
+        // NoteDrawing i w tej samej transakcji (jeden SaveChanges) dopisuje wezel drawingBlock na koncu
+        // TipTap JSON notatki - bez niego aplikacja www nie pokazalaby rysunku. UpdatedAt i RowVersion
+        // odswiezane jak przy zwyklym zapisie, wiec otwarty edytor www wykryje zmiane.
+        public async Task<AddDeviceDrawingResult> AddDeviceDrawingAsync(Guid userId, Guid noteId, string? strokesJson)
+        {
+            // Jedna ponowna proba przy wyscigu z innym zapisem notatki (jak w SetTaskCheckedAsync):
+            // dopisanie bloku na swiezo wczytanej tresci nie nadpisuje cudzej zmiany.
+            for (var attempt = 0; ; attempt++)
+            {
+                var note = await _db.Notes.FirstOrDefaultAsync(n => n.Id == noteId);
+                if (note is null || !await CanEditAsync(userId, note))
+                    return new AddDeviceDrawingResult(AddDeviceDrawingStatus.NotFound);
+
+                var error = DrawingStrokesValidator.Validate(strokesJson);
+                if (error is not null)
+                    return new AddDeviceDrawingResult(AddDeviceDrawingStatus.InvalidDrawing, Error: error);
+
+                var existing = await _db.NoteDrawings.CountAsync(d => d.NoteId == noteId);
+                if (existing >= MaxDrawingsPerNote)
+                    return new AddDeviceDrawingResult(AddDeviceDrawingStatus.TooManyDrawings,
+                        Error: $"Notatka ma juz maksymalna liczbe rysunkow ({MaxDrawingsPerNote}).");
+
+                var drawing = new NoteDrawing
+                {
+                    Id = Guid.NewGuid(),
+                    NoteId = noteId,
+                    StrokesJson = strokesJson!,
+                    SortOrder = existing, // jak w AddDrawingAsync
+                    CreatedAt = DateTime.UtcNow
+                };
+                _db.NoteDrawings.Add(drawing);
+
+                note.TextContent = TipTapTasks.AppendDrawingBlock(note.TextContent, drawing.Id);
+                note.UpdatedAt = DateTime.UtcNow;
+                note.RowVersion = NewRowVersion();
+
+                try
+                {
+                    await _db.SaveChangesAsync();
+                    return new AddDeviceDrawingResult(AddDeviceDrawingStatus.Ok,
+                        new NoteDrawingDto(drawing.Id, drawing.StrokesJson, drawing.SortOrder), note.GroupId);
+                }
+                catch (DbUpdateConcurrencyException) when (attempt == 0)
+                {
+                    _db.Entry(note).State = EntityState.Detached;
+                    _db.Entry(drawing).State = EntityState.Detached;
                 }
                 catch (DbUpdateConcurrencyException)
                 {

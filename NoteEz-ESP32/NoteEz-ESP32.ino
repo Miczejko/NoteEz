@@ -13,6 +13,7 @@
 #include "src/screens/NotesScreen.h"
 #include "src/screens/NoteDetailScreen.h"
 #include "src/screens/DrawingScreen.h"
+#include "src/screens/DrawingEditScreen.h"
 #include "src/sensors/ClimateSensor.h"
 #include "src/screens/WeatherScreen.h"
 #include "src/screens/TimerScreen.h"
@@ -142,6 +143,8 @@ void loop() {
   if (!touched) {
     resetTouchStart = 0;
     touchReleased = true;
+    // edytor rysunku: po krotkiej przerwie w dotyku (DRAW_PEN_UP_MS) zatwierdza biezaca linie
+    if (currentScreen == SCREEN_DRAW_EDIT) drawEditPenUpTick();
     // Light sleep test wypadl dobrze (patrz historia w git) - docelowy tryb to deep sleep,
     // bo oszczedza duzo wiecej energii (restartuje caly chip zamiast trzymac go w stanie
     // wstrzymania). Po wybudzeniu kod wraca do setup() od zera - display.init() sam zajmuje
@@ -226,7 +229,7 @@ void loop() {
       return;
     }
 
-    if (detailHasDrawing && pointInRect(x, y, DRAWING_BTN_X, DRAWING_BTN_Y, DRAWING_BTN_W, DRAWING_BTN_H)) {
+    if (pointInRect(x, y, DRAWING_BTN_X, DRAWING_BTN_Y, DRAWING_BTN_W, DRAWING_BTN_H)) {
       detailDrawingIndex = 0;
       renderDrawingScreen(detailDrawingIndex);
       delay(300); // debounce
@@ -336,9 +339,19 @@ void loop() {
         return;
       }
     }
+  } else if (currentScreen == SCREEN_DRAW_EDIT) {
+    // celowo bez delay() po dotyku - kreski musza byc probkowane z pelna czestotliwoscia petli;
+    // debounce przyciskow jest wewnatrz drawEditTouch (DRAW_BTN_DEBOUNCE_MS)
+    drawEditTouch(x, y, freshTouch);
   } else { // SCREEN_DRAWING
     if (pointInRect(x, y, BACK_BTN_X, BACK_BTN_Y, BACK_BTN_W, BACK_BTN_H)) {
       renderNoteDetail();
+      delay(300); // debounce
+      return;
+    }
+
+    if (pointInRect(x, y, DRAW_NEW_BTN_X, DRAW_NEW_BTN_Y, DRAW_NEW_BTN_W, DRAW_NEW_BTN_H)) {
+      openDrawingEditor();
       delay(300); // debounce
       return;
     }

@@ -74,13 +74,12 @@ void drawDetailChrome() {
   if (shownTitle.length() > 12) shownTitle = shownTitle.substring(0, 11) + "..";
   display.println(shownTitle);
 
-  if (detailHasDrawing) {
-    display.fillRoundRect(DRAWING_BTN_X + 4, DRAWING_BTN_Y + 2, DRAWING_BTN_W - 8, DRAWING_BTN_H - 4, 6, COLOR_ACCENT_MINT);
-    display.setTextColor(COLOR_ON_ACCENT);
-    display.setTextSize(1);
-    display.setCursor(DRAWING_BTN_X + 9, DRAWING_BTN_Y + 12);
-    display.print("Rys.");
-  }
+  // "Rys." zawsze widoczny - ekran rysunkow pokazuje liste albo "Brak rysunkow" + "Nowy rysunek"
+  display.fillRoundRect(DRAWING_BTN_X + 4, DRAWING_BTN_Y + 2, DRAWING_BTN_W - 8, DRAWING_BTN_H - 4, 6, COLOR_ACCENT_MINT);
+  display.setTextColor(COLOR_ON_ACCENT);
+  display.setTextSize(1);
+  display.setCursor(DRAWING_BTN_X + 9, DRAWING_BTN_Y + 12);
+  display.print("Rys.");
 
   drawScrollButtons(detailScrollLine > 0, detailScrollLine < detailMaxScroll());
 }
@@ -199,7 +198,6 @@ void selectNote(int index) {
 
 
   detailTitle = String((const char*)(detailDoc["title"] | "(bez tytulu)"));
-  detailHasDrawing = detailDoc["drawings"].as<JsonArray>().size() > 0;
   detailHasAudio = detailDoc["audioClips"].as<JsonArray>().size() > 0;
   detailDrawingIndex = 0;
 
