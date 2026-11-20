@@ -4,8 +4,8 @@
 
 set -e
 
-DOMAIN="api.twoja-domena.pl"
-EMAIL="twoj@email.pl"
+DOMAIN="api.noteez.online"
+EMAIL="noteez-kontakt@outlook.com"
 
 if [ "$DOMAIN" = "api.twoja-domena.pl" ]; then
   echo "Najpierw podmien DOMAIN i EMAIL w tym skrypcie oraz w nginx/conf.d/noteez.conf"
