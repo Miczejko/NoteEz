@@ -50,6 +50,7 @@ tail -f ~/.noteez-deploy/deploy.log             # na żywo (Ctrl+C kończy)
 | `deploy.log` | historia zdarzeń deployu (rotuje się sama przy 2000 linii) |
 | `last_build.log` | wyjście ostatniego `docker compose up --build` (tu szukaj błędu budowania) |
 | `last_recover.log` | wyjście ostatniej automatycznej naprawy (`up -d`) |
+| `built_sha` | commit, z którego **zbudowano obecnie działające kontenery** (nie musi być równy `HEAD` po ręcznym `git pull`) |
 | `blocked_sha` | commit, którego skrypt nie wdraża (zły albo z migracją) |
 | `unhealthy` | istnieje, gdy API jest akurat niezdrowe |
 
@@ -69,9 +70,16 @@ crontab -l                                       # czy cron jest ustawiony
 ```
 <repo>/scripts/deploy-backend.sh --dry-run       # pokazuje, co by zrobił, niczego nie zmienia (cisza = nie ma nic do wdrożenia)
 <repo>/scripts/deploy-backend.sh                 # robi to samo co cron (wdraża, jeśli jest nowy commit)
-<repo>/scripts/deploy-backend.sh --force         # omija blokadę migracji i listę złych commitów, i zakaz cofania
+<repo>/scripts/deploy-backend.sh --rebuild       # przebudowuje kontenery z kodu, który jest teraz w repo na VM
+<repo>/scripts/deploy-backend.sh --force         # omija blokadę migracji, listę złych commitów, zakaz cofania i kontrolę "kontynuacji historii"
 ```
 Jeśli drugi skrypt już działa (np. cron), nowy powie, żeby spróbować za chwilę.
+
+**Uwaga o ręcznym `git pull` / `git checkout`:** zmienia tylko pliki, **nie kontenery**. Skrypt porównuje kod w repo z tym, z czego
+zbudowano kontenery (`built_sha`), więc przy najbliższym cronie sam przebuduje backend, jeśli się różni (log: `START przebudowa`).
+`--status` ostrzega o takim rozjeździe (`UWAGA: backend w repo rozni sie od zbudowanych kontenerow`). Gdy nie chcesz czekać na cron,
+użyj `--rebuild`. Przy pierwszym uruchomieniu po wgraniu tej wersji skryptu nie ma jeszcze `built_sha` i skrypt zakłada, że kontenery
+pochodzą z bieżącego commitu, więc jeśli wiesz, że jest inaczej, zrób raz `--rebuild`.
 
 ## 5. Co znaczą wpisy w `deploy.log`
 
@@ -79,7 +87,9 @@ Jeśli drugi skrypt już działa (np. cron), nowy powie, żeby spróbować za ch
 |---|---|---|
 | `START deploy A -> B` | zaczyna wdrażać commit B | nic, czekaj na `OK` |
 | `OK wdrozono B` | wdrożone i zdrowe | nic |
+| `START przebudowa B: kontenery są zbudowane z A, a kod w repo to B` | kod w repo różnił się od kontenerów (np. po ręcznym pullu) | nic, czekaj na `OK` |
 | `OK B: zmiany poza NoteEz-Server/ ...` | tylko aktualizacja plików, bez budowania | nic |
+| `POMINIETO: origin/main (B) nie jest kontynuacją wdrożonego commita (A)` | śledzona gałąź to inna linia historii (np. stary commit merge'owy), więc automatyczne wdrożenie mogłoby podmienić kod na starszy | `git log --oneline --graph --all`; zmerguj poprawnie do tej gałęzi, a jeśli zmiana jest zamierzona, `--force` |
 | `BLAD deploy B (...)` + `ROLLBACK ... udany` | nowy kod nie przeszedł sprawdzenia zdrowia, wrócono do starego | napraw błąd w kodzie (patrz `last_build.log` i `docker logs noteez-api`); nowy commit zostanie wdrożony automatycznie |
 | `KRYTYCZNE: rollback ... tez nie przywrocil zdrowia` | API nie działa nawet po powrocie | wejdź na VM: `docker ps`, `docker logs noteez-api`, `last_build.log` |
 | `ZABLOKOWANO ... nowa migracja bazy` | w commicie jest migracja EF, skrypt jej nie robi sam | sekcja 6 |
