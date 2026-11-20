@@ -1,0 +1,2 @@
+# Skrypty powloki musza miec koncowki linii LF (CRLF psuje je w Git Bash i na Linuksie)
+*.sh text eol=lf
